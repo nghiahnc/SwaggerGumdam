@@ -103,9 +103,11 @@ Khi triển khai thật sau này, dùng HTTPS, đặt `Payments__Provider=Stripe
 
 Stripe hiện chưa liệt kê Việt Nam trong danh sách nơi mở tài khoản Stripe trực tiếp, dù VND là đồng tiền có thể hiển thị/thu. Vì vậy bản demo giữ Stripe tắt và không cam kết bật thanh toán thật bằng tài khoản doanh nghiệp Việt Nam. [Stripe global availability](https://stripe.com/global).
 
-## 6. Kết nối Flutter sau này
+## 6. Kết nối Flutter
 
 Flutter chỉ cần gửi request HTTPS và đọc JSON. Đặt base URL theo máy chạy API; nếu dùng Android emulator với server trên cùng máy, thường dùng địa chỉ mạng của host thay vì `localhost` của emulator. Lưu JWT an toàn trong ứng dụng; gửi `Authorization: Bearer <token>` cho request cần quyền. Với danh sách sản phẩm, có thể dùng REST `GET /api/v1/products?page=1&pageSize=20` hoặc OData. Giá là số nguyên VND, thời gian UTC dạng ISO 8601, ID là GUID dạng chuỗi. Dùng `status` HTTP và `title` của Problem Details để hiển thị lỗi cho người dùng.
+
+Để demo Flutter trong Edge trên cùng máy, chạy API ở `http://127.0.0.1:5288` và truyền `--dart-define=API_BASE_URL=http://127.0.0.1:5288` cho Flutter. Android Emulator dùng `http://10.0.2.2:5288`. API chỉ cho phép CORS từ origin `localhost` hoặc `127.0.0.1` (cổng bất kỳ) trong môi trường Development. Sau khi cập nhật API, phải khởi động lại tiến trình backend để nhận cấu hình CORS mới.
 
 ## 7. Kiểm thử và giới hạn hiện tại
 
