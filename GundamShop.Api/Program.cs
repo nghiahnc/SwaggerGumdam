@@ -35,6 +35,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     };
 });
 builder.Services.AddAuthorization(o => o.AddPolicy("Admin", p => p.RequireRole("Admin")));
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddCors(o => o.AddPolicy("FlutterWebDevelopment", policy => policy
+        .SetIsOriginAllowed(origin => Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+            && (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || uri.Host == "127.0.0.1")
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+        .AllowAnyHeader()
+        .AllowAnyMethod()));
+}
 var edm = new ODataConventionModelBuilder();
 edm.EntitySet<ProductODataDto>("Products");
 builder.Services.AddControllers().AddOData(o => o.Filter().OrderBy().Count().SetMaxTop(50).AddRouteComponents("odata", edm.GetEdmModel()));
@@ -49,6 +58,8 @@ builder.Services.AddSwaggerGen(o =>
 var app = builder.Build();
 app.UseMiddleware<ApiExceptionMiddleware>();
 if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
+app.UseRouting();
+if (app.Environment.IsDevelopment()) app.UseCors("FlutterWebDevelopment");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
