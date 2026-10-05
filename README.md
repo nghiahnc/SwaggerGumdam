@@ -1,6 +1,6 @@
 # Gundam Shop API
 
-Backend cửa hàng mô hình Gundam cho nhóm PRN232, viết bằng ASP.NET Core Web API (.NET 8), EF Core và SQL Server. API dùng JSON; chưa có giao diện React hoặc Flutter.
+Backend cửa hàng mô hình Gundam cho nhóm PRN232, viết bằng ASP.NET Core Web API (.NET 8), EF Core và SQL Server. API dùng JSON. Ứng dụng Flutter của môn PRM393 nằm trong [thư mục PRM393](PRM393/README.md), tách khỏi solution backend.
 
 ## Bắt đầu nhanh trên Windows
 
