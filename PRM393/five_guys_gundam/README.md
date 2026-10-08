@@ -1,6 +1,6 @@
 # FiveGuysGundam · PRM393 Flutter
 
-Ứng dụng Flutter cho cửa hàng mô hình Gundam, dùng REST API của dự án PRN232 tại [SwaggerGumdam](https://github.com/nghiahnc/SwaggerGumdam). Android là nền tảng demo chính của PRM393; Edge có thể dùng để thử nhanh trên máy tính. Đây là **dự án PRM393 riêng**; ứng dụng không chứa bản sao API hay database SQL Server.
+Ứng dụng Flutter cho cửa hàng mô hình Gundam, dùng REST API của dự án PRN232. Bản API đi kèm nằm ở gốc repo này; [repo API/Swagger độc lập](https://github.com/nghiahnc/GundamShop-PRN232-API) cũng cung cấp cùng endpoint. Android là nền tảng demo chính của PRM393; Edge có thể dùng để thử nhanh trên máy tính. Ứng dụng Flutter không chứa database SQL Server.
 
 - [Giải thích dự án và danh sách chức năng](PROJECT_GUIDE.md)
 - [Map code, màn hình, API và luồng dữ liệu](CODE_MAP.md)
@@ -17,7 +17,8 @@
    dotnet run --project GundamShop.Api --urls http://0.0.0.0:5288
    ```
 
-   Backend cần SQL Server LocalDB hoặc connection string SQL Server đã cấu hình. Chi tiết: [hướng dẫn database PRN232](https://github.com/nghiahnc/SwaggerGumdam/blob/main/VISUAL_STUDIO_DATABASE_SETUP.md).
+   Backend cần SQL Server LocalDB hoặc connection string SQL Server đã cấu hình. Chi tiết: [hướng dẫn database PRN232](https://github.com/nghiahnc/GundamShop-PRN232-API/blob/main/VISUAL_STUDIO_DATABASE_SETUP.md).
+
 3. Mở terminal PowerShell thứ hai trong thư mục ứng dụng. Với Android Emulator, chạy:
 
    ```powershell
