@@ -1,6 +1,6 @@
 # PRM393 · FiveGuysGundam Flutter
 
-Ứng dụng Flutter của môn PRM393 nằm trong [five_guys_gundam](five_guys_gundam/README.md). Backend PRN232 vẫn ở thư mục gốc của repository; hai phần có tài liệu và lệnh chạy riêng.
+Ứng dụng Flutter của môn PRM393 nằm trong [five_guys_gundam](five_guys_gundam/README.md). Bản API đi kèm để demo nằm ở thư mục gốc repository này; [repo API/Swagger độc lập cho PRN232](https://github.com/nghiahnc/GundamShop-PRN232-API) có thể chạy riêng.
 
 Sau khi clone repository, mở hai terminal PowerShell ở thư mục gốc:
 

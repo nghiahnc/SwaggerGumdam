@@ -1,6 +1,6 @@
-# Gundam Shop API
+# FiveGuysGundam · Flutter + API demo
 
-Backend cửa hàng mô hình Gundam cho nhóm PRN232, viết bằng ASP.NET Core Web API (.NET 8), EF Core và SQL Server. API dùng JSON. Ứng dụng Flutter của môn PRM393 nằm trong [thư mục PRM393](PRM393/README.md), tách khỏi solution backend.
+Repository này giữ cả backend ASP.NET Core Web API và [ứng dụng Flutter PRM393](PRM393/README.md) để chạy demo cùng nhau. Backend ở thư mục gốc, Flutter ở `PRM393/five_guys_gundam/`. Bản **API/Swagger độc lập cho môn PRN232** nằm tại [GundamShop-PRN232-API](https://github.com/nghiahnc/GundamShop-PRN232-API).
 
 ## Bắt đầu nhanh trên Windows
 
@@ -12,11 +12,11 @@ Backend cửa hàng mô hình Gundam cho nhóm PRN232, viết bằng ASP.NET Cor
    dotnet ef database update --project GundamShop.Dal --startup-project GundamShop.Api
    $env:ASPNETCORE_ENVIRONMENT = 'Development'
    $env:Database__AutoMigrate = 'true'
-   dotnet run --project GundamShop.Api
+   dotnet run --project GundamShop.Api --urls http://0.0.0.0:5288
    ```
 
-3. Mở URL Swagger được in khi ứng dụng chạy, thêm `/swagger`. Tài khoản demo chỉ được tạo trong Development: `admin@gundam.local` / `Admin123!`.
-4. Đọc [hướng dẫn dev](docs/DEVELOPER_GUIDE.md) để hiểu kiến trúc, cách thử API và Stripe.
+3. Mở Swagger tại `http://127.0.0.1:5288/swagger`. Tài khoản demo chỉ được tạo trong Development: `admin@gundam.local` / `Admin123!`.
+4. Đọc [hướng dẫn Flutter](PRM393/README.md) để chạy ứng dụng và [hướng dẫn dev API](docs/DEVELOPER_GUIDE.md) để hiểu kiến trúc, cách thử endpoint và Stripe.
 
 Nếu mới clone dự án và muốn cài database **trong Visual Studio**, làm theo [hướng dẫn Visual Studio + SQL Server Object Explorer](VISUAL_STUDIO_DATABASE_SETUP.md).
 
