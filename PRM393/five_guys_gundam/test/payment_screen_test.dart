@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:five_guys_gundam/screens/payment.dart';
+import 'package:http/http.dart' as http;
 
 import 'support/fake_shop_api.dart';
 
@@ -243,5 +244,68 @@ void main() {
     answer.complete();
     await tester.pumpAndSettle();
     expect(find.text('Đã thanh toán'), findsOneWidget);
+  });
+
+  testWidgets('API down while loading: the error offers a retry that works', (
+    tester,
+  ) async {
+    var down = true;
+    fake.onRequest('GET', orderPath, (_) {
+      if (down) throw http.ClientException('connection refused');
+      return FakeShopApi.json(orderJson(id: orderId, status: status));
+    });
+    await open(tester);
+    expect(find.text('Yêu cầu mạng thất bại. Hãy thử lại.'), findsOneWidget);
+    down = false;
+    await tester.tap(find.text('Thử lại'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chờ thanh toán'), findsOneWidget);
+    expect(find.byKey(const Key('mock-success')), findsOneWidget);
+  });
+
+  testWidgets('a 409 while the order is still pending keeps the reason', (
+    tester,
+  ) async {
+    fake.refuse('POST', sessionPath, 409, 'Đơn sắp hết hạn, hãy tạo đơn mới.');
+    await open(tester);
+    expect(fake.count('GET $orderPath'), 2);
+    expect(find.text('Đơn sắp hết hạn, hãy tạo đơn mới.'), findsOneWidget);
+    expect(find.text('Chờ thanh toán'), findsOneWidget);
+  });
+
+  testWidgets('a payment set-up error (5xx) is shown as one plain sentence', (
+    tester,
+  ) async {
+    fake.refuse(
+      'POST',
+      sessionPath,
+      503,
+      'Cần Stripe secret key hợp lệ; live key chỉ được bật trong Production.',
+    );
+    await open(tester);
+    expect(
+      find.text('Thanh toán đang tạm gián đoạn, hãy thử lại sau.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Stripe secret key'), findsNothing);
+  });
+
+  testWidgets('Stripe: reloading before Stripe reports back says so', (
+    tester,
+  ) async {
+    fake.on('POST', sessionPath, {
+      'orderId': orderId,
+      'provider': 'Stripe',
+      'status': 'Pending',
+      'checkoutUrl': 'https://checkout.stripe.com/c/pay/test',
+    });
+    await open(tester);
+    await tester.tap(find.byKey(const Key('stripe-reload')));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Chưa nhận được kết quả từ Stripe'),
+      findsOneWidget,
+    );
+    expect(fake.count('GET $orderPath'), 2);
   });
 }

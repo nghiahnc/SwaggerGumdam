@@ -25,7 +25,7 @@ abstract final class PaymentPolicy {
       'Thanh toán thất bại. Đơn đã đóng; tồn kho và lượt voucher (nếu có) '
           'đã được hoàn lại.',
     'Cancelled' => 'Đơn đã bị hủy nên không thể thanh toán.',
-    'Expired' => 'Đơn đã quá hạn thanh toán. Hãy đặt lại đơn mới.',
+    'Expired' => 'Đơn đã quá hạn thanh toán. Hãy tạo đơn mới.',
     _ => 'Đơn không còn chờ thanh toán (${orderStatus(status)}).',
   };
 
