@@ -353,11 +353,27 @@ class _VoucherDialogState extends State<VoucherDialog> {
       // The API accepts any dates; keep an existing voucher's own date pickable.
       firstDate: current.isBefore(DateTime(2020)) ? current : DateTime(2020),
       lastDate: current.isAfter(DateTime(2100)) ? current : DateTime(2100),
+      helpText: 'Chọn ngày',
+      cancelText: 'Hủy',
+      confirmText: 'Chọn',
+      fieldLabelText: 'Ngày',
+      errorFormatText: 'Sai định dạng ngày',
+      errorInvalidText: 'Ngày ngoài phạm vi',
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(current),
+      helpText: 'Chọn giờ',
+      cancelText: 'Hủy',
+      confirmText: 'Chọn',
+      hourLabelText: 'Giờ',
+      minuteLabelText: 'Phút',
+      // The form shows 24-hour times (dd/MM/yyyy HH:mm); so does the picker.
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+        child: child!,
+      ),
     );
     if (time == null || !mounted) return;
     final picked = DateTime(
@@ -419,6 +435,8 @@ class _VoucherDialogState extends State<VoucherDialog> {
       child: AlertDialog(
         // Scrolls instead of overflowing with large system fonts.
         scrollable: true,
+        // Narrow side margins leave room for the field messages on phones.
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         title: Text(_editing ? 'Sửa voucher' : 'Thêm voucher'),
         content: SizedBox(
           width: 440,
@@ -437,6 +455,8 @@ class _VoucherDialogState extends State<VoucherDialog> {
                   textCapitalization: TextCapitalization.characters,
                   decoration: InputDecoration(
                     labelText: 'Mã voucher',
+                    errorMaxLines: 3,
+                    helperMaxLines: 2,
                     helperText: typed.isNotEmpty && typed != normalized
                         ? 'Sẽ lưu là $normalized'
                         : 'Khách nhập mã này khi đặt hàng',
@@ -550,7 +570,12 @@ class _VoucherDialogState extends State<VoucherDialog> {
       controller: controller,
       enabled: !_saving,
       keyboardType: TextInputType.number,
-      decoration: InputDecoration(labelText: label, helperText: helper),
+      decoration: InputDecoration(
+        labelText: label,
+        helperText: helper,
+        errorMaxLines: 3,
+        helperMaxLines: 2,
+      ),
       validator: validator,
     ),
   );

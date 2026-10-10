@@ -178,8 +178,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('voucher-code')), 'new50');
     await tester.enterText(find.byKey(const Key('voucher-discount')), '50000');
+    await tester.enterText(
+      find.byKey(const Key('voucher-min-subtotal')),
+      '300000',
+    );
     await tester.tap(find.byKey(const Key('voucher-save')));
     await tester.pumpAndSettle();
+    expect(fake.lastBody('POST', '/api/v1/vouchers')['minSubtotalVnd'], 300000);
 
     expect(find.byKey(const Key('voucher-save')), findsNothing);
     expect(find.text('Đã thêm voucher NEW50'), findsOneWidget);
@@ -289,5 +294,38 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('voucher-save')), findsNothing);
     expect(find.text('Đã thêm voucher WAIT'), findsOneWidget);
+  });
+
+  testWidgets('an empty list says how to start', (tester) async {
+    fake.on('GET', '/api/v1/vouchers', page([]));
+    await open(tester);
+    expect(
+      find.text('Chưa có voucher. Bấm "Thêm voucher" để tạo mã đầu tiên.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('field messages may wrap instead of being cut off', (
+    tester,
+  ) async {
+    // Test fonts are far wider than real ones, so the check is on the
+    // setting itself: every field lets its message use up to 3 lines.
+    await open(tester);
+    await tester.tap(find.byKey(const Key('add-voucher')));
+    await tester.pumpAndSettle();
+    for (final key in [
+      'voucher-code',
+      'voucher-discount',
+      'voucher-min-subtotal',
+      'voucher-max-uses',
+    ]) {
+      final field = tester.widget<TextField>(
+        find.descendant(
+          of: find.byKey(Key(key)),
+          matching: find.byType(TextField),
+        ),
+      );
+      expect(field.decoration!.errorMaxLines, 3, reason: key);
+    }
   });
 }
