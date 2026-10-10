@@ -1,6 +1,6 @@
 # Voucher, đánh giá và thanh toán (FL-13 · FL-14 · FL-15)
 
-Phần việc của **Trần Hiếu Nghĩa** theo `PhanCong_Flutter_PRM393.xlsx`: hai màn hình chính `VouchersScreen`, `ReviewsScreen` và màn bổ sung `PaymentScreen`. Ba màn hình giữ đúng file trong bảng phân công; logic kiểm tra được tách ra `lib/core/*_policy.dart` để unit test chạy không cần server.
+Phần việc của **Trần Hiếu Nghĩa** theo bảng phân công Flutter PRM393 của nhóm (`PhanCong_Flutter_PRM393.xlsx`, nằm ngoài repo; bảng API PRN232 là phân công riêng): hai màn hình chính `VouchersScreen`, `ReviewsScreen` và màn bổ sung `PaymentScreen`. Ba màn hình giữ đúng file trong bảng phân công; logic kiểm tra được tách ra `lib/core/*_policy.dart` để unit test chạy không cần server.
 
 | Task | Màn hình | Ai dùng, vào từ đâu | API |
 | --- | --- | --- | --- |
@@ -15,7 +15,8 @@ Phần việc của **Trần Hiếu Nghĩa** theo `PhanCong_Flutter_PRM393.xlsx`
 - Lỗi hiện sau lần bấm Lưu đầu tiên, rồi cập nhật theo từng lần sửa.
 - Khi đang lưu, nút Lưu bị khóa và không đóng được form. Bấm ra ngoài form cũng không đóng, để không mất dữ liệu đang nhập. Khi đang xóa hoặc gửi kết quả mock, thanh tiến trình hiện dưới tiêu đề, còn menu và nút bị khóa; lúc gửi kết quả mock thì nút Back cũng bị khóa.
 - Sau mỗi lần ghi, danh sách hoặc đơn hàng được đọc lại từ API, vì dữ liệu có thể đổi ở chỗ khác: checkout tăng lượt dùng voucher, thanh toán đổi trạng thái đơn.
-- 401/403 không có nội dung được đổi thành câu dễ hiểu (`lib/core/error_text.dart`). Các lỗi khác hiện đúng câu tiếng Việt API trả về.
+- 401/403 không có nội dung được đổi thành câu dễ hiểu (`lib/core/error_text.dart`). Màn Thanh toán đổi lỗi 5xx (thông báo cấu hình dành cho lập trình viên) thành "Thanh toán đang tạm gián đoạn, hãy thử lại sau.". Các lỗi khác hiện đúng câu tiếng Việt API trả về.
+- Form dùng lề hẹp trên điện thoại; dòng lỗi được xuống tối đa 3 dòng thay vì bị cắt.
 - **Ngày giờ:** API trả ngày đọc từ SQL Server **không có hậu tố `Z`**, dù đó là giờ UTC. Ví dụ: tạo voucher thì nhận `2026-10-20T07:00:00Z`, nhưng đọc danh sách thì nhận `2026-10-20T07:00:00`. `parseUtc` trong `lib/core/dates.dart` đọc cả hai dạng là UTC. Nếu không, hạn voucher hiện sớm 7 tiếng và mỗi lần sửa lại bị lùi thêm 7 tiếng.
 
 ## 2. FL-13 · Voucher (Admin)
@@ -43,6 +44,7 @@ Phần việc của **Trần Hiếu Nghĩa** theo `PhanCong_Flutter_PRM393.xlsx`
 
   Các quy tắc chặt hơn API (mẫu mã, mức tối đa) chỉ áp dụng cho giá trị mới nhập. Voucher tạo từ nơi khác (ví dụ Swagger) với mã có dấu vẫn sửa được ngày mà không phải đổi mã.
 
+- **Chọn ngày giờ:** tiêu đề và nút của bộ chọn là tiếng Việt, giờ luôn ở dạng 24 giờ như trên form.
 - **Ngừng sử dụng** là xóa mềm (`IsActive = false`), có hộp xác nhận. Voucher đã ngừng không còn menu, vì API không có cách bật lại.
 
 ## 3. FL-14 · Đánh giá
@@ -67,16 +69,16 @@ Phần việc của **Trần Hiếu Nghĩa** theo `PhanCong_Flutter_PRM393.xlsx`
 
 - Màn hình đọc đơn trước. Chỉ khi đơn còn **Chờ thanh toán** mới xin phiên thanh toán, vì API từ chối các đơn khác bằng 409.
 - Nếu API vẫn từ chối mở phiên:
-  - 409 vì đơn vừa đổi trạng thái: màn hình đọc lại đơn và hiện trạng thái mới;
-  - lý do khác (đơn sắp hết hạn, không phải đơn của mình): màn hình vẫn hiện thông tin đơn kèm lý do.
-- Đơn 0 ₫ được API đánh dấu đã thanh toán ngay khi mở phiên; màn hình hiện luôn kết quả thành công.
+  - 409: màn hình đọc lại đơn. Đơn đã đổi trạng thái (đã trả qua Stripe, hết hạn) thì hiện trạng thái mới; đơn vẫn chờ (Stripe: "Đơn sắp hết hạn, hãy tạo đơn mới.") thì hiện thông tin đơn kèm lý do;
+  - 404 "Không tìm thấy đơn hàng." (ví dụ Admin mở đơn của khách) và lỗi 5xx: vẫn hiện thông tin đơn kèm lý do.
+- Với provider Stripe, đơn 0 ₫ được API đánh dấu đã thanh toán ngay khi mở phiên; màn hình hiện luôn kết quả thành công. Với Mock (Development), đơn 0 ₫ vẫn hiện hai nút mô phỏng.
 - **Mock** (backend ở Development):
   - hai nút "Mô phỏng thanh toán thành công" và "Mô phỏng thanh toán thất bại";
   - sau khi gửi, màn hình **đọc lại đơn** và hiện trạng thái API báo: *Đã thanh toán*, hoặc *Thanh toán thất bại* kèm việc tồn kho và lượt voucher đã được hoàn;
   - có nút "Quay lại đơn hàng", và màn chi tiết đơn cũng tải lại.
 - **Stripe:**
   - nút "Mở Stripe Checkout" mở trang thanh toán bằng `url_launcher`;
-  - đơn chỉ đổi trạng thái khi Stripe gọi webhook về backend, nên có nút "Tôi đã thanh toán, tải lại trạng thái";
+  - đơn chỉ đổi trạng thái khi Stripe gọi webhook về backend, nên có nút "Tôi đã thanh toán, tải lại trạng thái". Nếu đơn vẫn chờ, app báo "Chưa nhận được kết quả từ Stripe…";
   - backend cần `Payments:Provider = Stripe`, test key, SuccessUrl/CancelUrl và webhook secret.
 
 ## 5. Kiểm thử
@@ -85,9 +87,9 @@ Phần việc của **Trần Hiếu Nghĩa** theo `PhanCong_Flutter_PRM393.xlsx`
 | --- | --- | --- | --- |
 | `test/voucher_policy_test.dart` | Unit | 12 | Ngày sai, voucher hết hạn (ranh giới bắt đầu/kết thúc), mã, số tiền, lượt; đọc ngày UTC |
 | `test/review_payment_policy_test.dart` | Unit | 7 | Form rỗng, sửa/xóa của người khác; nhãn kết quả thanh toán |
-| `test/vouchers_screen_test.dart` | Widget | 12 | Quyền Admin (không gửi request; 403), voucher hết hạn và ngày hiển thị theo giờ máy, ngày sai, mã trùng (409), thêm, sửa (PUT giữ nguyên thời điểm), lượt tối đa không dưới số đã dùng, voucher có mã cũ, không đóng form khi đang lưu, ngừng sử dụng |
-| `test/reviews_screen_test.dart` | Widget | 10 | Đánh giá trước giao (403), sửa/xóa của người khác, form rỗng, viết, sửa, xóa (danh sách cập nhật), 404 khi sửa, 409 khi viết |
-| `test/payment_screen_test.dart` | Widget | 11 | Hai kết quả mock, tải lại trạng thái đơn sau thanh toán, đơn không còn chờ, mock bị từ chối, đơn 0 ₫, phiên bị từ chối (409/404), mở đúng URL Stripe, khóa nút và Back khi đang gửi |
+| `test/vouchers_screen_test.dart` | Widget | 14 | Quyền Admin (không gửi request; 403), voucher hết hạn và ngày hiển thị theo giờ máy, ngày sai, mã trùng (409), thêm (gửi đủ mức giảm và đơn tối thiểu), sửa (PUT giữ nguyên thời điểm), lượt tối đa không dưới số đã dùng, voucher có mã cũ, không đóng form khi đang lưu, ngừng sử dụng, danh sách rỗng, dòng lỗi được xuống dòng |
+| `test/reviews_screen_test.dart` | Widget | 14 | Đánh giá trước giao (403), sửa/xóa của người khác, form rỗng (cả trường hợp chỉ thiếu số sao), viết, sửa, xóa (danh sách cập nhật), 404 khi sửa, 409 khi viết, xóa bị từ chối, danh sách rỗng, 5 ngôi sao trên một dòng ở màn 320px |
+| `test/payment_screen_test.dart` | Widget | 15 | Hai kết quả mock, tải lại trạng thái đơn sau thanh toán, đơn không còn chờ, mock bị từ chối, đơn 0 ₫, phiên bị từ chối (409 đơn đã đổi / 409 đơn vẫn chờ / 404 / 5xx), mất kết nối rồi Thử lại, mở đúng URL Stripe, Stripe chưa báo kết quả, khóa nút và Back khi đang gửi |
 
 Widget test dùng `test/support/fake_shop_api.dart`: API giả qua `MockClient`, mỗi test tự khai báo câu trả lời. Các test quyền Admin, ngày sai, form rỗng và đơn không còn chờ kiểm tra cả việc **không** gửi request. Các câu trả lời giả đã được đối chiếu với API thật ngày 10/10/2026:
 - "Mã voucher đã tồn tại." (409);
@@ -100,7 +102,31 @@ flutter analyze
 flutter test
 ```
 
-Kết quả ngày 10/10/2026 (có AI hỗ trợ, sinh viên cần tự chạy lại): `flutter analyze` không có lỗi; `flutter test` qua **55/55**, gồm 52 test của phần này và 3 test cũ. Phép thử ngược: gài lần lượt 12 lỗi cố ý vào code (ví dụ sửa voucher lại gửi POST, hiển thị ngày theo UTC, bỏ chặn Admin, bỏ tải lại sau mock); cả 12 lần test đều báo lỗi.
+Kết quả ngày 10/10/2026 (có AI hỗ trợ, sinh viên cần tự chạy lại):
+- `flutter analyze` không có lỗi; `flutter test` qua **65/65**, gồm 62 test của phần này và 3 test cũ.
+- Chạy với API thật (Development, LocalDB): 21/21 bước kiểm tra cả ba màn qua `ShopRepository` thật. Gồm tạo/sửa/ngừng voucher, mã trùng, khách bị 403, đánh giá trước và sau khi giao, sửa đánh giá của người khác bị 404, mock thất bại hoàn tồn kho, mock thành công.
+- `flutter build apk --release --dart-define=API_BASE_URL=http://10.0.2.2:5288` build được (APK khoảng 53,6 MB).
+
+**Phép thử ngược.** Gài lần lượt 16 lỗi cố ý vào code, mỗi lần chạy lại test của màn đó. Cả 16 lần test đều báo lỗi. Có thể tự lặp lại bằng cách sửa đúng dòng rồi chạy `flutter test <file>`:
+
+| # | File | Lỗi gài vào | Test bắt được |
+| --- | --- | --- | --- |
+| 1 | `vouchers.dart` | `id: old?.id` → `id: null` (sửa lại thành tạo mới) | `vouchers_screen_test.dart` |
+| 2 | `dates.dart` | bỏ `toLocal()` (hiện ngày theo UTC) | `vouchers_screen_test.dart` |
+| 3 | `dates.dart` | không thêm `Z` cho ngày thiếu múi giờ | `voucher_policy_test.dart` |
+| 4 | `vouchers.dart` | `canPop: true` (đóng được form khi đang lưu) | `vouchers_screen_test.dart` |
+| 5 | `vouchers.dart` | bỏ kiểm tra Admin | `vouchers_screen_test.dart` |
+| 6 | `vouchers.dart` | `usedCount: 0` (bỏ qua số lượt đã dùng) | `vouchers_screen_test.dart` |
+| 7 | `vouchers.dart` | luôn gửi `minSubtotalVnd: 0` | `vouchers_screen_test.dart` |
+| 8 | `reviews.dart` | không tải lại sau khi xóa | `reviews_screen_test.dart` |
+| 9 | `review_policy.dart` | ai cũng sửa được đánh giá | `reviews_screen_test.dart` |
+| 10 | `reviews.dart` | bỏ chặn khi chưa chọn sao | `reviews_screen_test.dart` |
+| 11 | `payment.dart` | không đọc lại đơn sau mock | `payment_screen_test.dart` |
+| 12 | `payment.dart` | bỏ nhánh đơn 0 ₫ | `payment_screen_test.dart` |
+| 13 | `payment.dart` | nút mock không bị khóa khi đang gửi | `payment_screen_test.dart` |
+| 14 | `payment.dart` | nút "Mở Stripe Checkout" không làm gì | `payment_screen_test.dart` |
+| 15 | `payment.dart` | tải lại Stripe không báo khi đơn vẫn chờ | `payment_screen_test.dart` |
+| 16 | `payment.dart` | hiện nguyên văn lỗi 5xx | `payment_screen_test.dart` |
 
 ## 6. Giới hạn đã biết (backend)
 
@@ -108,7 +134,9 @@ Kết quả ngày 10/10/2026 (có AI hỗ trợ, sinh viên cần tự chạy l�
 - `PUT /api/v1/vouchers/{id}` không có `isActive`, nên voucher đã ngừng không bật lại được.
 - Mã voucher đã ngừng vẫn tính là trùng khi tạo mới.
 - Danh sách đánh giá không có tên người viết. App chỉ đánh dấu được "Đánh giá của bạn".
-- App chỉ tải 100 đánh giá mới nhất (`pageSize=100` trong `ShopRepository.reviews`, file dùng chung). Sản phẩm có hơn 100 đánh giá thì điểm trung bình chỉ tính trên 100 đánh giá đó.
+- App chỉ tải 100 đánh giá mới nhất (`pageSize=100` trong `ShopRepository.reviews`, file dùng chung). Sản phẩm có hơn 100 đánh giá thì số lượt và điểm trung bình chỉ tính trên 100 đánh giá đó.
+- Màn voucher chỉ tải 100 mã đầu theo thứ tự mã (`pageSize=100` trong `ShopRepository.vouchers`; API không cho lớn hơn 100); chưa có phân trang.
+- Bộ chọn ngày vẫn hiện tên tháng và thứ bằng tiếng Anh, vì app chưa bật `flutter_localizations` và locale `vi` trong `main.dart` (file dùng chung, cần nhóm thống nhất).
 - Mock chỉ có trong Development. Stripe cần cấu hình riêng.
 
 ## 7. Demo nhanh
