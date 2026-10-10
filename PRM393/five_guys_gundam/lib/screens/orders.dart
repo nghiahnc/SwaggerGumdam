@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/models.dart';
+import '../core/order_status.dart';
 import '../core/session.dart';
 import '../core/shop_repository.dart';
 import '../widgets/common.dart';
@@ -50,13 +51,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
           : AsyncPanel<List<ShopOrder>>(
               future: future,
               onRetry: reload,
-              isEmpty: (items) => items.isEmpty,
+              // Trang > 1 rỗng vẫn vào builder để còn nút "Trang trước".
+              isEmpty: (items) => items.isEmpty && page == 1,
               emptyMessage: 'Chưa có đơn hàng.',
               builder: (items) => RefreshIndicator(
                 onRefresh: () async => reload(),
                 child: ListView(
                   padding: const EdgeInsets.all(12),
                   children: [
+                    if (items.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'Không còn đơn ở trang này.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     for (final order in items)
                       Card(
                         child: ListTile(
@@ -64,7 +74,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             'Đơn ${order.id.substring(0, 8)} · ${money(order.totalVnd)}',
                           ),
                           subtitle: Text(
-                            '${order.status} · ${order.items.length} sản phẩm',
+                            '${orderStatusLabel(order.status)} · ${order.items.length} sản phẩm',
                           ),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () async {
@@ -120,6 +130,7 @@ class OrderDetailScreen extends StatefulWidget {
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late Future<ShopOrder> future;
+  bool busy = false;
   @override
   void initState() {
     super.initState();
@@ -135,16 +146,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         !mounted) {
       return;
     }
+    setState(() => busy = true);
     try {
       await context.read<ShopRepository>().cancelOrder(widget.orderId);
       if (mounted) reload();
     } catch (error) {
       if (mounted) showError(context, error);
+    } finally {
+      if (mounted) setState(() => busy = false);
     }
   }
 
   Future<void> advance(String status) async {
-    if (!await confirm(context, 'Chuyển đơn sang $status?') || !mounted) return;
+    if (!await confirm(
+          context,
+          'Chuyển đơn sang "${orderStatusLabel(status)}"?',
+        ) ||
+        !mounted) {
+      return;
+    }
+    setState(() => busy = true);
     try {
       await context.read<ShopRepository>().setOrderStatus(
         widget.orderId,
@@ -153,6 +174,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (mounted) reload();
     } catch (error) {
       if (mounted) showError(context, error);
+    } finally {
+      if (mounted) setState(() => busy = false);
     }
   }
 
@@ -173,8 +196,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 'Đơn ${order.id.substring(0, 8)}',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
-              Text('Trạng thái: ${order.status}'),
-              Text('Thanh toán: ${order.paymentStatus}'),
+              Text('Trạng thái: ${orderStatusLabel(order.status)}'),
+              Text('Thanh toán: ${paymentStatusLabel(order.paymentStatus)}'),
               Text('Tạo lúc: ${order.createdAtUtc.toLocal()}'),
               if (order.status == 'PendingPayment')
                 Text('Hết hạn: ${order.expiresAtUtc.toLocal()}'),
@@ -193,31 +216,35 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 20),
-              if (order.status == 'PendingPayment') ...[
+              if (order.status == 'PendingPayment')
                 FilledButton.icon(
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => PaymentScreen(orderId: order.id),
-                      ),
-                    );
-                    if (mounted) reload();
-                  },
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PaymentScreen(orderId: order.id),
+                            ),
+                          );
+                          if (mounted) reload();
+                        },
                   icon: const Icon(Icons.payment),
                   label: const Text('Thanh toán'),
                 ),
-                OutlinedButton(onPressed: cancel, child: const Text('Hủy đơn')),
-              ],
-              if (isAdmin && order.status == 'Paid')
-                FilledButton(
-                  onPressed: () => advance('Shipped'),
-                  child: const Text('Xác nhận đã gửi hàng'),
+              if (canCancelOrder(order.status))
+                OutlinedButton(
+                  onPressed: busy ? null : cancel,
+                  child: const Text('Hủy đơn'),
                 ),
-              if (isAdmin && order.status == 'Shipped')
+              if (nextAdminStatus(order.status) case final next? when isAdmin)
                 FilledButton(
-                  onPressed: () => advance('Delivered'),
-                  child: const Text('Xác nhận đã giao hàng'),
+                  onPressed: busy ? null : () => advance(next),
+                  child: Text(
+                    next == 'Shipped'
+                        ? 'Xác nhận đã gửi hàng'
+                        : 'Xác nhận đã giao hàng',
+                  ),
                 ),
             ],
           ),
