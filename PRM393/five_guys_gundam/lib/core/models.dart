@@ -1,3 +1,5 @@
+import 'dates.dart';
+
 typedef Json = Map<String, dynamic>;
 Json asJson(dynamic value) => Map<String, dynamic>.from(value as Map);
 List<Json> asJsonList(dynamic value) => (value as List).map(asJson).toList();
@@ -133,8 +135,8 @@ class Voucher {
       minSubtotalVnd = asInt(j['minSubtotalVnd']),
       maxUses = asInt(j['maxUses']),
       usedCount = asInt(j['usedCount']),
-      startsAtUtc = DateTime.parse(j['startsAtUtc'] as String),
-      endsAtUtc = DateTime.parse(j['endsAtUtc'] as String),
+      startsAtUtc = parseUtc(j['startsAtUtc'] as String),
+      endsAtUtc = parseUtc(j['endsAtUtc'] as String),
       isActive = j['isActive'] as bool;
   final String id, code;
   final int discountVnd, minSubtotalVnd, maxUses, usedCount;
@@ -149,7 +151,7 @@ class Review {
       userId = j['userId'] as String,
       rating = asInt(j['rating']),
       comment = j['comment'] as String,
-      createdAtUtc = DateTime.parse(j['createdAtUtc'] as String);
+      createdAtUtc = parseUtc(j['createdAtUtc'] as String);
   final String id, productId, userId, comment;
   final int rating;
   final DateTime createdAtUtc;
