@@ -4,6 +4,7 @@
 
 - [Giải thích dự án và danh sách chức năng](PROJECT_GUIDE.md)
 - [Map code, màn hình, API và luồng dữ liệu](CODE_MAP.md)
+- [Voucher, đánh giá và thanh toán (FL-13..15)](VOUCHER_REVIEW_PAYMENT.md)
 - [AI Assistance Log](AI_ASSISTANCE_LOG.md)
 
 ## Chạy nhanh
