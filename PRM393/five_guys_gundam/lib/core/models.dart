@@ -55,6 +55,34 @@ class ProductSearchHit {
   final int? fromPriceVnd;
 }
 
+/// Một trang kết quả OData: `value` là sản phẩm, `@odata.count` là tổng số
+/// sản phẩm khớp bộ lọc (không phụ thuộc $skip/$top).
+class ProductSearchPage {
+  ProductSearchPage({
+    required this.items,
+    required this.skip,
+    required this.pageSize,
+    this.totalCount,
+  });
+  ProductSearchPage.fromJson(
+    Json j, {
+    required this.skip,
+    required this.pageSize,
+  }) : items = asJsonList(j['value']).map(ProductSearchHit.fromJson).toList(),
+       totalCount = j['@odata.count'] == null ? null : asInt(j['@odata.count']);
+  final List<ProductSearchHit> items;
+  final int skip, pageSize;
+  final int? totalCount;
+
+  int get pageNumber => skip ~/ pageSize + 1;
+  int? get pageCount =>
+      totalCount == null ? null : (totalCount! / pageSize).ceil();
+  bool get hasPrevious => skip > 0;
+  bool get hasNext => totalCount == null
+      ? items.length >= pageSize
+      : skip + items.length < totalCount!;
+}
+
 class Variant {
   Variant.fromJson(Json j)
     : id = j['id'] as String,

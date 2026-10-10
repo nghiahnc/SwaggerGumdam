@@ -15,7 +15,9 @@ Tài liệu này nối **màn hình → state/logic → model → endpoint → k
 | `lib/core/cart_policy.dart` | Quy tắc số lượng trước khi thêm giỏ |
 | `lib/widgets/common.dart` | `AsyncPanel` loading/empty/error/data, tiền VND, validation, dialog xác nhận, snackbar |
 | `lib/screens/shell.dart` | NavigationBar; tab quản trị chỉ hiện cho Admin |
-| `test/cart_policy_test.dart` | Unit test số lượng hợp lệ, 0, >99, vượt tồn |
+| `test/cart_policy_test.dart` | Unit test số lượng hợp lệ, 0, >99, vượt tồn; giới hạn tối đa theo tồn |
+| `test/catalog_test.dart` | FL-04: query OData ($filter/$skip/$count), phân trang theo tổng số, rỗng + xóa bộ lọc, mất mạng rồi thử lại |
+| `test/product_screen_test.dart` | FL-05: SKU hết hàng bị khóa, số lượng dừng ở tồn, khách chưa đăng nhập bị yêu cầu đăng nhập, thêm giỏ đúng SKU/số lượng |
 | `test/async_panel_test.dart` | Widget test lỗi bất đồng bộ và nút Thử lại |
 
 ## 2. Map màn hình và API

@@ -3,3 +3,6 @@ String? validateQuantity(int quantity, int stock) {
   if (quantity > stock) return 'Số lượng vượt tồn kho hiện tại.';
   return null;
 }
+
+/// Số lượng lớn nhất được chọn cho một SKU: không vượt tồn và không quá 99.
+int maxQuantity(int stock) => stock.clamp(0, 99);
