@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/api_client.dart';
 import '../core/models.dart';
 import '../core/session.dart';
 import '../core/shop_repository.dart';
@@ -16,6 +17,7 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   late Future<List<CartLine>> future;
+  bool busy = false;
   @override
   void initState() {
     super.initState();
@@ -28,13 +30,28 @@ class _CartScreenState extends State<CartScreen> {
         : Future.value([]);
   });
 
+  // JWT chỉ nằm trong RAM và không có refresh token, nên 401 = cần đăng nhập lại.
+  void handleError(Object error) {
+    if (error is ApiException && error.statusCode == 401) {
+      showError(
+        context,
+        'Phiên đăng nhập đã hết hạn. Hãy đăng xuất và đăng nhập lại.',
+      );
+    } else {
+      showError(context, error);
+    }
+  }
+
   Future<void> change(CartLine line, int quantity) async {
-    if (quantity < 1 || quantity > 99) return;
+    if (busy || quantity < 1 || quantity > 99) return;
+    setState(() => busy = true);
     try {
       await context.read<ShopRepository>().updateCart(line.id, quantity);
       if (mounted) reload();
     } catch (error) {
-      if (mounted) showError(context, error);
+      if (mounted) handleError(error);
+    } finally {
+      if (mounted) setState(() => busy = false);
     }
   }
 
@@ -43,11 +60,14 @@ class _CartScreenState extends State<CartScreen> {
         !mounted) {
       return;
     }
+    setState(() => busy = true);
     try {
       await context.read<ShopRepository>().deleteCart(line.id);
       if (mounted) reload();
     } catch (error) {
-      if (mounted) showError(context, error);
+      if (mounted) handleError(error);
+    } finally {
+      if (mounted) setState(() => busy = false);
     }
   }
 
@@ -107,7 +127,8 @@ class _CartScreenState extends State<CartScreen> {
                                       Row(
                                         children: [
                                           IconButton(
-                                            onPressed: line.quantity > 1
+                                            onPressed:
+                                                !busy && line.quantity > 1
                                                 ? () => change(
                                                     line,
                                                     line.quantity - 1,
@@ -117,7 +138,8 @@ class _CartScreenState extends State<CartScreen> {
                                           ),
                                           Text('${line.quantity}'),
                                           IconButton(
-                                            onPressed: line.quantity < 99
+                                            onPressed:
+                                                !busy && line.quantity < 99
                                                 ? () => change(
                                                     line,
                                                     line.quantity + 1,
@@ -128,7 +150,9 @@ class _CartScreenState extends State<CartScreen> {
                                           const Spacer(),
                                           Text(money(line.totalVnd)),
                                           IconButton(
-                                            onPressed: () => remove(line),
+                                            onPressed: busy
+                                                ? null
+                                                : () => remove(line),
                                             icon: const Icon(
                                               Icons.delete_outline,
                                             ),
@@ -155,16 +179,19 @@ class _CartScreenState extends State<CartScreen> {
                               ),
                             ),
                             FilledButton(
-                              onPressed: () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        CheckoutScreen(subtotalVnd: subtotal),
-                                  ),
-                                );
-                                if (mounted) reload();
-                              },
+                              onPressed: busy
+                                  ? null
+                                  : () async {
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => CheckoutScreen(
+                                            subtotalVnd: subtotal,
+                                          ),
+                                        ),
+                                      );
+                                      if (mounted) reload();
+                                    },
                               child: const Text('Đặt hàng'),
                             ),
                           ],
