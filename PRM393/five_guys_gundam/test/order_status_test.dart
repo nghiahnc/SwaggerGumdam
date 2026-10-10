@@ -26,6 +26,21 @@ void main() {
     expect(paymentStatusLabel('Partial'), 'Partial');
   });
 
+  test('every known status has a hint, unknown has none', () {
+    for (final status in [
+      'PendingPayment',
+      'Paid',
+      'PaymentFailed',
+      'Shipped',
+      'Delivered',
+      'Cancelled',
+      'Expired',
+    ]) {
+      expect(orderStatusHint(status), isNotNull, reason: status);
+    }
+    expect(orderStatusHint('OnHold'), isNull);
+  });
+
   test('only PendingPayment orders can be cancelled', () {
     expect(canCancelOrder('PendingPayment'), isTrue);
     for (final status in [

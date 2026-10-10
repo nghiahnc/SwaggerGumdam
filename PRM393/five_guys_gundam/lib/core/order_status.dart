@@ -20,6 +20,19 @@ String paymentStatusLabel(String status) => switch (status) {
   _ => status,
 };
 
+// Câu giải thích ngắn cho khách ở màn chi tiết đơn; giá trị lạ không có gợi ý.
+String? orderStatusHint(String status) => switch (status) {
+  'PendingPayment' =>
+    'Hãy thanh toán trước hạn. Quá hạn, đơn sẽ tự hủy và hoàn tồn kho.',
+  'Paid' => 'Đơn đã thanh toán, đang chờ cửa hàng gửi hàng.',
+  'Shipped' => 'Đơn đang được giao đến bạn.',
+  'Delivered' => 'Đơn đã giao thành công. Bạn có thể đánh giá sản phẩm.',
+  'Cancelled' => 'Đơn đã hủy, tồn kho đã được hoàn lại.',
+  'Expired' => 'Đơn quá hạn thanh toán nên đã tự hủy.',
+  'PaymentFailed' => 'Thanh toán thất bại, tồn kho đã được hoàn lại.',
+  _ => null,
+};
+
 // Backend chỉ cho hủy đơn chưa thanh toán (ShoppingService.Cancel).
 bool canCancelOrder(String status) => status == 'PendingPayment';
 
