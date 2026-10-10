@@ -68,17 +68,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
     try {
       session = await repository.paymentSession(widget.orderId);
     } on ApiException catch (error) {
-      // 409: the order changed in between (paid through Stripe, expired);
-      // show what it is now. Anything else (an order expiring within 30
-      // minutes, not this customer's order) keeps the order on screen with
-      // the reason, since retrying would only fail again.
+      // 409: the order changed in between (paid through Stripe, expired), or
+      // (Stripe) it expires within 30 minutes. Read it again: a new status is
+      // shown as the outcome; an order still pending keeps the reason. Other
+      // refusals (404: not this customer's order; 5xx: payment set-up) keep
+      // the order on screen with the reason, since retrying fails again.
       if (error.statusCode == 409) {
         final now = await repository.order(widget.orderId);
         if (now.status != PaymentPolicy.pending) return _PaymentView(now, null);
       }
-      return _PaymentView(order, null, problem: describeError(error));
+      return _PaymentView(order, null, problem: _paymentError(error));
     }
-    // A free order (total 0) is marked paid by the session call itself.
+    // With Stripe, a free order (total 0) is marked paid by the session call.
     if (session['status'] == 'Paid') {
       order = await repository.order(widget.orderId);
       return _PaymentView(order, null);
@@ -94,7 +95,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     try {
       await repository.completeMock(widget.orderId, succeeded);
     } catch (error) {
-      problem = describeError(error);
+      problem = _paymentError(error);
     }
     if (!mounted) return;
     setState(() => busy = false);
@@ -104,6 +105,38 @@ class _PaymentScreenState extends State<PaymentScreen> {
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(problem)));
+    }
+  }
+
+  /// 5xx answers carry the API's set-up messages (Stripe keys, provider
+  /// name) meant for developers; customers get one plain sentence.
+  static String _paymentError(Object error) =>
+      error is ApiException && (error.statusCode ?? 0) >= 500
+      ? 'Thanh toán đang tạm gián đoạn, hãy thử lại sau.'
+      : describeError(error);
+
+  /// After paying on Stripe: read the order again and say so when Stripe has
+  /// not reported back yet, instead of silently showing the same screen.
+  Future<void> checkStripe() async {
+    final messenger = ScaffoldMessenger.of(context);
+    reload();
+    _PaymentView view;
+    try {
+      view = await future;
+    } catch (_) {
+      return; // the error panel already explains it
+    }
+    if (view.pending && messenger.mounted) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Chưa nhận được kết quả từ Stripe. Nếu đã trả tiền, hãy đợi vài '
+              'giây rồi tải lại.',
+            ),
+          ),
+        );
     }
   }
 
@@ -172,7 +205,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               _StripeActions(
                 onOpen: () =>
                     openStripe(view.session!['checkoutUrl'] as String),
-                onReload: reload,
+                onReload: checkStripe,
               )
             else
               const Text(
@@ -233,8 +266,8 @@ class _MockActions extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       const Text(
-        'Chế độ thử (Development): chọn một kết quả để kiểm tra cả luồng đơn '
-        'hàng. Thất bại sẽ đóng đơn và hoàn tồn kho.',
+        'Chế độ thử: chọn một kết quả để kiểm tra cả luồng đơn '
+        'hàng. Thất bại sẽ đóng đơn, hoàn tồn kho và lượt voucher.',
       ),
       const SizedBox(height: 16),
       FilledButton.icon(
