@@ -136,7 +136,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
     final userId = session.user?.id;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Đánh giá · ${widget.productName}'),
+        title: const Text('Đánh giá'),
         actions: [
           IconButton(
             tooltip: 'Tải lại',
@@ -161,7 +161,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
             child: ListView(
               padding: const EdgeInsets.all(12),
               children: [
-                _Summary(reviews: reviews),
+                _Summary(productName: widget.productName, reviews: reviews),
                 const SizedBox(height: 8),
                 _WriteAction(
                   signedIn: session.isSignedIn,
@@ -214,7 +214,8 @@ void _show(ScaffoldMessengerState messenger, String message) {
 }
 
 class _Summary extends StatelessWidget {
-  const _Summary({required this.reviews});
+  const _Summary({required this.productName, required this.reviews});
+  final String productName;
   final List<Review> reviews;
 
   @override
@@ -226,6 +227,9 @@ class _Summary extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Here rather than in the app bar, where a long kit name is cut.
+            Text(productName, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
             Text(
               average == null
                   ? 'Chưa có điểm đánh giá'
@@ -411,6 +415,8 @@ class _ReviewDialogState extends State<ReviewDialog> {
       canPop: !_saving,
       child: AlertDialog(
         scrollable: true,
+        // Narrow side margins keep the five stars on one line on phones.
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         title: Text(widget.old == null ? 'Viết đánh giá' : 'Sửa đánh giá'),
         content: SizedBox(
           width: 400,
@@ -427,21 +433,26 @@ class _ReviewDialogState extends State<ReviewDialog> {
                   _rating == 0 ? 'Chọn số sao' : '$_rating / 5 sao',
                   key: const Key('review-rating-label'),
                 ),
-                Wrap(
-                  children: [
-                    for (var i = 1; i <= 5; i++)
-                      IconButton(
-                        key: Key('star-$i'),
-                        tooltip: '$i sao',
-                        onPressed: _saving
-                            ? null
-                            : () => setState(() => _rating = i),
-                        icon: Icon(
-                          i <= _rating ? Icons.star : Icons.star_border,
-                          color: const Color(0xFFF59E0B),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (var i = 1; i <= 5; i++)
+                        IconButton(
+                          key: Key('star-$i'),
+                          tooltip: '$i sao',
+                          onPressed: _saving
+                              ? null
+                              : () => setState(() => _rating = i),
+                          icon: Icon(
+                            i <= _rating ? Icons.star : Icons.star_border,
+                            color: const Color(0xFFF59E0B),
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
                 if (ratingError != null)
                   Text(
@@ -456,9 +467,22 @@ class _ReviewDialogState extends State<ReviewDialog> {
                   enabled: !_saving,
                   maxLines: 4,
                   maxLength: ReviewPolicy.commentMaxLength,
+                  // Count like the validator and the API (UTF-16 units), so
+                  // the counter never says "600/1000" next to "tối đa 1000".
+                  buildCounter:
+                      (
+                        context, {
+                        required currentLength,
+                        required isFocused,
+                        maxLength,
+                      }) => Text(
+                        '${_comment.text.length}/${ReviewPolicy.commentMaxLength}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                   decoration: const InputDecoration(
                     labelText: 'Nhận xét',
                     hintText: 'Chất lượng nhựa, độ khớp, hướng dẫn lắp…',
+                    errorMaxLines: 3,
                   ),
                   validator: ReviewPolicy.comment,
                 ),
