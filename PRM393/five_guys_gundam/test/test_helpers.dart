@@ -31,6 +31,7 @@ Future<void> pumpScreen(
       requests?.add('${request.method} ${request.url.path}');
       final body = responses['${request.method} ${request.url.path}'];
       if (body == null) return http.Response('', 404);
+      if (body is http.Response) return body; // Lỗi dựng sẵn, ví dụ 409.
       return http.Response.bytes(
         utf8.encode(jsonEncode(body)),
         200,
@@ -56,3 +57,10 @@ Future<void> pumpScreen(
   );
   await tester.pumpAndSettle();
 }
+
+// Response lỗi dạng Problem Details giống backend (ví dụ 409 hết tồn kho).
+http.Response problem(int status, String title) => http.Response.bytes(
+  utf8.encode(jsonEncode({'title': title, 'status': status})),
+  status,
+  headers: {'content-type': 'application/problem+json; charset=utf-8'},
+);

@@ -51,6 +51,28 @@ void main() {
     expect(requests, isNot(contains('POST /api/v1/orders')));
   });
 
+  testWidgets('out-of-stock 409 stays visible above the order button', (
+    tester,
+  ) async {
+    await pumpScreen(tester, const CheckoutScreen(subtotalVnd: 2500000), {
+      'GET /api/v1/addresses': [address],
+      'POST /api/v1/orders': problem(
+        409,
+        'SKU MG-UNICORN-001 không đủ tồn kho.',
+      ),
+    });
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Tạo đơn hàng'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Đồng ý'));
+    await tester.pumpAndSettle();
+
+    // Hiện ở SnackBar và ở hộp lỗi cố định; vẫn ở màn đặt hàng.
+    expect(find.text('SKU MG-UNICORN-001 không đủ tồn kho.'), findsNWidgets(2));
+    expect(find.byIcon(Icons.error_outline), findsOneWidget);
+    expect(find.text('Xác nhận đặt hàng'), findsOneWidget);
+  });
+
   testWidgets('empty cart shows message and hides order button', (
     tester,
   ) async {

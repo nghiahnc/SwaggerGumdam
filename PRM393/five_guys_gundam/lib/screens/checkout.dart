@@ -21,6 +21,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final formKey = GlobalKey<FormState>();
   final voucher = TextEditingController();
   bool busy = false;
+  // Lỗi gần nhất từ API (hết tồn, voucher...), hiện cố định trên nút đặt hàng.
+  String? lastError;
 
   @override
   void initState() {
@@ -61,7 +63,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         !mounted) {
       return;
     }
-    setState(() => busy = true);
+    setState(() {
+      busy = true;
+      lastError = null;
+    });
     try {
       final order = await context.read<ShopRepository>().checkout(
         addressId!,
@@ -73,7 +78,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: order.id)),
       );
     } catch (error) {
-      if (mounted) showError(context, error);
+      if (mounted) {
+        setState(() => lastError = error.toString());
+        showError(context, error);
+      }
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -170,26 +178,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   top: false,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                      ),
-                      onPressed: busy || addresses.isEmpty ? null : submit,
-                      child: busy
-                          ? const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SizedBox.square(
-                                  dimension: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                                SizedBox(width: 12),
-                                Text('Đang tạo đơn...'),
-                              ],
-                            )
-                          : const Text('Tạo đơn hàng'),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      spacing: 12,
+                      children: [
+                        if (lastError != null) _ErrorBox(lastError!),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48),
+                          ),
+                          onPressed: busy || addresses.isEmpty ? null : submit,
+                          child: busy
+                              ? const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox.square(
+                                      dimension: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                    SizedBox(width: 12),
+                                    Text('Đang tạo đơn...'),
+                                  ],
+                                )
+                              : const Text('Tạo đơn hàng'),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -197,6 +213,36 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+// Hộp lỗi đỏ nằm cố định trên nút "Tạo đơn hàng" (SnackBar tự ẩn và che nút).
+class _ErrorBox extends StatelessWidget {
+  const _ErrorBox(this.message);
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        spacing: 8,
+        children: [
+          Icon(Icons.error_outline, color: scheme.onErrorContainer),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: scheme.onErrorContainer),
+            ),
+          ),
+        ],
       ),
     );
   }

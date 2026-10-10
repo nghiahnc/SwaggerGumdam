@@ -168,60 +168,73 @@ class _CartLineCard extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: 12,
+        child: Column(
+          spacing: 8,
           children: [
-            const ProductArt(size: 64),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 2,
-                children: [
-                  Text(
-                    line.productName,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  Text(
-                    'SKU ${line.sku}',
-                    style: theme.textTheme.bodySmall?.copyWith(color: muted),
-                  ),
-                  Text(
-                    'Đơn giá ${money(line.unitPriceVnd)}',
-                    style: theme.textTheme.bodySmall?.copyWith(color: muted),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
+            // Hàng trên: ảnh + thông tin + nút xóa.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 12,
+              children: [
+                const ProductArt(size: 64),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: 2,
                     children: [
-                      _QuantityStepper(
-                        quantity: line.quantity,
-                        onMinus: !busy && line.quantity > 1
-                            ? () => onChange(line.quantity - 1)
-                            : null,
-                        onPlus: !busy && line.quantity < 99
-                            ? () => onChange(line.quantity + 1)
-                            : null,
-                      ),
-                      const Spacer(),
                       Text(
-                        money(line.totalVnd),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w700,
+                        line.productName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      Text(
+                        'SKU ${line.sku}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: muted,
+                        ),
+                      ),
+                      Text(
+                        'Đơn giá ${money(line.unitPriceVnd)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: muted,
                         ),
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Xóa khỏi giỏ',
+                  onPressed: busy ? null : onRemove,
+                  color: theme.colorScheme.error,
+                  icon: const Icon(Icons.delete_outline),
+                ),
+              ],
+            ),
+            // Hàng dưới trải hết chiều ngang: số lượng | thành tiền.
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Row(
+                children: [
+                  _QuantityStepper(
+                    quantity: line.quantity,
+                    onMinus: !busy && line.quantity > 1
+                        ? () => onChange(line.quantity - 1)
+                        : null,
+                    onPlus: !busy && line.quantity < 99
+                        ? () => onChange(line.quantity + 1)
+                        : null,
+                  ),
+                  const Spacer(),
+                  Text(
+                    money(line.totalVnd),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
-            ),
-            IconButton(
-              tooltip: 'Xóa khỏi giỏ',
-              onPressed: busy ? null : onRemove,
-              color: theme.colorScheme.error,
-              icon: const Icon(Icons.delete_outline),
             ),
           ],
         ),
