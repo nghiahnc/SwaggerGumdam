@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../core/models.dart';
 import '../core/shop_repository.dart';
+import '../core/voucher_policy.dart';
 import '../widgets/common.dart';
 import 'addresses.dart';
 import 'orders.dart';
@@ -17,6 +18,7 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   late Future<List<Address>> future;
   String? addressId;
+  final formKey = GlobalKey<FormState>();
   final voucher = TextEditingController();
   bool busy = false;
 
@@ -40,6 +42,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       showError(context, 'Hãy chọn địa chỉ giao hàng.');
       return;
     }
+    if (!formKey.currentState!.validate()) return;
     if (!await confirm(
           context,
           'Tạo đơn và giữ tồn kho cho các sản phẩm trong giỏ?',
@@ -51,7 +54,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       final order = await context.read<ShopRepository>().checkout(
         addressId!,
-        voucher.text.trim().isEmpty ? null : voucher.text.trim(),
+        normalizeVoucherCode(voucher.text),
       );
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -113,12 +116,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               label: const Text('Quản lý địa chỉ'),
             ),
             const SizedBox(height: 24),
-            TextField(
-              controller: voucher,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                labelText: 'Mã voucher (nếu có)',
-                helperText: 'API sẽ kiểm tra điều kiện voucher khi tạo đơn.',
+            Form(
+              key: formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              child: TextFormField(
+                controller: voucher,
+                textCapitalization: TextCapitalization.characters,
+                validator: validateVoucherCode,
+                decoration: const InputDecoration(
+                  labelText: 'Mã voucher (nếu có)',
+                  helperText: 'API sẽ kiểm tra điều kiện voucher khi tạo đơn.',
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -128,7 +136,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             FilledButton(
               onPressed: busy || addresses.isEmpty ? null : submit,
               child: busy
-                  ? const CircularProgressIndicator()
+                  ? const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: 12),
+                        Text('Đang tạo đơn...'),
+                      ],
+                    )
                   : const Text('Tạo đơn hàng'),
             ),
           ],
