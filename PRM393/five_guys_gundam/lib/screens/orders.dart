@@ -9,6 +9,50 @@ import '../widgets/common.dart';
 import 'account.dart';
 import 'payment.dart';
 
+// API trả UTC; hiển thị giờ địa phương dạng dd/MM/yyyy HH:mm.
+String formatDateTime(DateTime utc) {
+  final t = utc.toLocal();
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(t.day)}/${two(t.month)}/${t.year} ${two(t.hour)}:${two(t.minute)}';
+}
+
+// Chip màu theo trạng thái đơn; giá trị lạ dùng màu xám.
+class OrderStatusChip extends StatelessWidget {
+  const OrderStatusChip(this.status, {super.key});
+  final String status;
+
+  static const colors = <String, MaterialColor>{
+    'PendingPayment': Colors.orange,
+    'Paid': Colors.blue,
+    'Shipped': Colors.purple,
+    'Delivered': Colors.green,
+    'PaymentFailed': Colors.red,
+    'Cancelled': Colors.blueGrey,
+    'Expired': Colors.blueGrey,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final color = colors[status] ?? Colors.blueGrey;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.shade50,
+        border: Border.all(color: color.shade200),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        orderStatusLabel(status),
+        style: TextStyle(
+          color: color.shade800,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
   @override
@@ -73,8 +117,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           title: Text(
                             'Đơn ${order.id.substring(0, 8)} · ${money(order.totalVnd)}',
                           ),
-                          subtitle: Text(
-                            '${orderStatusLabel(order.status)} · ${order.items.length} sản phẩm',
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Row(
+                              children: [
+                                OrderStatusChip(order.status),
+                                const SizedBox(width: 8),
+                                Text('${order.items.length} sản phẩm'),
+                              ],
+                            ),
                           ),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () async {
@@ -196,11 +247,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 'Đơn ${order.id.substring(0, 8)}',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
-              Text('Trạng thái: ${orderStatusLabel(order.status)}'),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    const Text('Trạng thái: '),
+                    OrderStatusChip(order.status),
+                  ],
+                ),
+              ),
               Text('Thanh toán: ${paymentStatusLabel(order.paymentStatus)}'),
-              Text('Tạo lúc: ${order.createdAtUtc.toLocal()}'),
+              Text('Tạo lúc: ${formatDateTime(order.createdAtUtc)}'),
               if (order.status == 'PendingPayment')
-                Text('Hết hạn: ${order.expiresAtUtc.toLocal()}'),
+                Text('Hết hạn: ${formatDateTime(order.expiresAtUtc)}'),
               const Divider(height: 28),
               for (final item in order.items)
                 ListTile(
