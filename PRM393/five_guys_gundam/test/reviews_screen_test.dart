@@ -222,4 +222,66 @@ void main() {
     expect(find.text('Không tìm thấy đánh giá.'), findsOneWidget);
     expect(fake.count('GET $listPath'), 2);
   });
+
+  testWidgets('form rỗng: a comment without stars is refused', (tester) async {
+    fake.signIn(id: 'customer-3', role: 'Customer');
+    await open(tester);
+    await tester.tap(find.byKey(const Key('review-write')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('review-comment')), 'Đẹp');
+    await tester.tap(find.byKey(const Key('review-save')));
+    await tester.pumpAndSettle();
+    expect(find.text('Chọn từ 1 đến 5 sao'), findsOneWidget);
+    expect(find.text('Hãy viết vài dòng nhận xét'), findsNothing);
+    expect(fake.calls.where((c) => c.startsWith('POST')), isEmpty);
+  });
+
+  testWidgets('an empty list shows the product and the empty state', (
+    tester,
+  ) async {
+    stored = [];
+    fake.signIn(id: 'customer-3', role: 'Customer');
+    await open(tester);
+    expect(find.text('RX-78-2 Gundam'), findsOneWidget);
+    expect(find.text('Chưa có điểm đánh giá'), findsOneWidget);
+    expect(find.byKey(const Key('reviews-empty')), findsOneWidget);
+    expect(find.byKey(const Key('review-write')), findsOneWidget);
+  });
+
+  testWidgets('a refused delete explains and reloads the list', (tester) async {
+    fake.signIn(id: 'customer-1', role: 'Customer');
+    fake.refuse(
+      'DELETE',
+      '/api/v1/reviews/r-mine',
+      404,
+      'Không tìm thấy đánh giá.',
+    );
+    await open(tester);
+    await tester.tap(find.byKey(const ValueKey('review-menu-r-mine')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Xóa'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Đồng ý'));
+    await tester.pumpAndSettle();
+    expect(find.text('Không tìm thấy đánh giá.'), findsOneWidget);
+    expect(fake.count('GET $listPath'), 2);
+  });
+
+  testWidgets('the five stars stay on one line on a 320 px phone', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    fake.signIn(id: 'customer-3', role: 'Customer');
+    await open(tester);
+    await tester.tap(find.byKey(const Key('review-write')));
+    await tester.pumpAndSettle();
+    final rows = {
+      for (var i = 1; i <= 5; i++)
+        tester.getTopLeft(find.byKey(Key('star-$i'))).dy,
+    };
+    expect(rows, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
 }
