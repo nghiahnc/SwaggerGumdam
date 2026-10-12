@@ -1,6 +1,6 @@
 import 'models.dart';
 
-/// Rules for writing a review (FL-14) and for who may change one.
+/// Rules for writing a review and for who may change one.
 ///
 /// The API is the authority (PromotionService.AddReview/UpdateReview/
 /// DeleteReview): one review per customer per product, only after an order

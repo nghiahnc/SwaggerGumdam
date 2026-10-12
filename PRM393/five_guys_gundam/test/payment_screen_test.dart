@@ -7,8 +7,8 @@ import 'package:http/http.dart' as http;
 
 import 'support/fake_shop_api.dart';
 
-/// FL-15 minimum tests: both mock results, and the order status read again
-/// after paying.
+/// Both mock results, the order status read again after paying, and how
+/// refused or failed calls are shown.
 void main() {
   const orderId = 'order-0001-aaaa';
   const orderPath = '/api/v1/orders/$orderId';

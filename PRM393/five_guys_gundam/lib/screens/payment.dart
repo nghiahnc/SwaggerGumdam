@@ -9,7 +9,7 @@ import '../core/payment_policy.dart';
 import '../core/shop_repository.dart';
 import '../widgets/common.dart';
 
-/// FL-15 · Pay one order that is waiting for payment.
+/// Pays one order that is waiting for payment.
 ///
 /// With `Payments:Provider = Stripe` the API returns a Stripe Checkout URL;
 /// the order only changes when Stripe calls the webhook, so the customer

@@ -11,7 +11,7 @@ import '../core/shop_repository.dart';
 import '../widgets/common.dart';
 import 'account.dart';
 
-/// FL-14 · Reviews of one product. Everyone can read them; a signed-in
+/// Reviews of one product. Everyone can read them; a signed-in
 /// customer can write one review per product after an order containing it
 /// was delivered, then edit or delete it. An admin can delete any review.
 ///

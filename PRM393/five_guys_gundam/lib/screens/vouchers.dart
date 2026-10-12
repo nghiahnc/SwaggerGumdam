@@ -9,7 +9,7 @@ import '../core/shop_repository.dart';
 import '../core/voucher_policy.dart';
 import '../widgets/common.dart';
 
-/// FL-13 · Admin voucher management: list, add, edit and stop using vouchers.
+/// Admin voucher management: list, add, edit and stop using vouchers.
 ///
 /// Every endpoint here is Admin-only on the API. The list is read again after
 /// each write because checkout changes `usedCount` outside this screen.

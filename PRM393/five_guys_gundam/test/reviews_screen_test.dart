@@ -4,8 +4,8 @@ import 'package:five_guys_gundam/screens/reviews.dart';
 
 import 'support/fake_shop_api.dart';
 
-/// FL-14 minimum tests: reviewing before delivery, editing/deleting someone
-/// else's review, empty form — plus write, edit and delete.
+/// Reviewing before delivery, editing/deleting someone else's review, the
+/// empty form, and the write, edit and delete flows.
 void main() {
   const listPath = '/api/v1/products/p-1/reviews';
   late FakeShopApi fake;

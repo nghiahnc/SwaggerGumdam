@@ -7,8 +7,8 @@ import 'package:five_guys_gundam/screens/vouchers.dart';
 
 import 'support/fake_shop_api.dart';
 
-/// FL-13 minimum tests: wrong dates, duplicate code, expired voucher, Admin
-/// permission — plus the list, add and stop flows they sit in.
+/// Wrong dates, duplicate code, expired voucher and Admin-only access, plus
+/// the list, add, edit and stop flows.
 void main() {
   const list = 'GET /api/v1/vouchers';
   final now = DateTime.now().toUtc();

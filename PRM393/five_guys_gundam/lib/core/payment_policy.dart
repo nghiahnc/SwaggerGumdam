@@ -1,4 +1,4 @@
-/// Labels for order and payment states shown on the payment screen (FL-15).
+/// Labels for order and payment states shown on the payment screen.
 ///
 /// The values are the API's (GundamShop.Bll/ShoppingService.cs,
 /// PaymentService.cs, GundamShop.Api/PendingOrderExpiryService.cs).

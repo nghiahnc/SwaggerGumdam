@@ -15,7 +15,7 @@ enum VoucherState {
   final String label;
 }
 
-/// Rules for the admin voucher form (FL-13). Each check returns `null` when
+/// Rules for the admin voucher form. Each check returns `null` when
 /// the value is fine, otherwise the message shown under the field.
 ///
 /// The API is still the authority and checks again (VoucherRequest in
