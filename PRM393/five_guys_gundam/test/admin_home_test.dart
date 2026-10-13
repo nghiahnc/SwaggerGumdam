@@ -10,9 +10,15 @@ import 'package:provider/provider.dart';
 import 'support/admin_fake_shop_api.dart';
 
 Future<void> pumpWithRepo(WidgetTester tester, Widget home) async {
+  final repo = FakeShopApi().seed().repository();
+  final session = SessionController(repo.api);
+  await session.login('admin@gundam.local', 'x');
   await tester.pumpWidget(
-    Provider<ShopRepository>.value(
-      value: FakeShopApi().seed().repository(),
+    MultiProvider(
+      providers: [
+        Provider<ShopRepository>.value(value: repo),
+        ChangeNotifierProvider<SessionController>.value(value: session),
+      ],
       child: MaterialApp(home: home),
     ),
   );
