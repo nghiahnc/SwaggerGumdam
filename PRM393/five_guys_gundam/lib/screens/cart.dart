@@ -215,6 +215,7 @@ class _CartLineCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: Row(
+                spacing: 12,
                 children: [
                   _QuantityStepper(
                     quantity: line.quantity,
@@ -225,12 +226,14 @@ class _CartLineCard extends StatelessWidget {
                         ? () => onChange(line.quantity + 1)
                         : null,
                   ),
-                  const Spacer(),
-                  Text(
-                    money(line.totalVnd),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w700,
+                  Expanded(
+                    child: Text(
+                      money(line.totalVnd),
+                      textAlign: TextAlign.end,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
