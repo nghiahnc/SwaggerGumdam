@@ -4,7 +4,7 @@
 
 - [Giải thích dự án và danh sách chức năng](PROJECT_GUIDE.md)
 - [Map code, màn hình, API và luồng dữ liệu](CODE_MAP.md)
-- [AI Assistance Log](AI_ASSISTANCE_LOG.md)
+
 
 ## Chạy nhanh
 
