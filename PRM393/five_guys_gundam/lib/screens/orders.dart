@@ -258,14 +258,18 @@ class _OrderCard extends StatelessWidget {
             spacing: 6,
             children: [
               Row(
+                spacing: 8,
                 children: [
-                  Text(
-                    'Đơn ${shortOrderId(order.id)}',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
+                  Expanded(
+                    child: Text(
+                      'Đơn ${shortOrderId(order.id)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                  const Spacer(),
                   OrderStatusChip(order.status),
                 ],
               ),
@@ -364,7 +368,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = context.watch<SessionController>().isAdmin;
+    final session = context.watch<SessionController>();
+    final isAdmin = session.isAdmin;
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Chi tiết đơn hàng')),
@@ -374,6 +379,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         builder: (order) {
           final hint = orderStatusHint(order.status);
           final color = orderStatusColor(order.status);
+          // API chỉ cho chủ đơn tạo phiên thanh toán (admin xem đơn khách sẽ bị 404).
+          // Backend cũ không trả userId thì giữ hành vi cũ.
+          final isOwner =
+              order.userId == null || order.userId == session.user?.id;
           return RefreshIndicator(
             onRefresh: () async => reload(),
             child: ListView(
@@ -493,7 +502,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   spacing: 8,
                   children: [
-                    if (order.status == 'PendingPayment')
+                    if (order.status == 'PendingPayment' && isOwner)
                       FilledButton.icon(
                         onPressed: busy ? null : () => pay(order),
                         icon: const Icon(Icons.payment),
@@ -575,8 +584,13 @@ class _InfoRow extends StatelessWidget {
       children: [
         Icon(icon, size: 18, color: muted),
         Text(label, style: TextStyle(color: muted)),
-        const Spacer(),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
       ],
     );
   }
@@ -589,10 +603,12 @@ class _AmountRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
+    spacing: 12,
     children: [
       Text(label, style: labelStyle),
-      const Spacer(),
-      Text(value, style: valueStyle),
+      Expanded(
+        child: Text(value, textAlign: TextAlign.end, style: valueStyle),
+      ),
     ],
   );
 }

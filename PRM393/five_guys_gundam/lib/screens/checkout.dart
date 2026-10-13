@@ -55,7 +55,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       showError(context, 'Hãy chọn địa chỉ giao hàng.');
       return;
     }
-    if (!formKey.currentState!.validate()) return;
+    // ListView chỉ dựng phần đang hiện: nhiều địa chỉ/màn thấp thì ô voucher
+    // có thể chưa được dựng, khi đó currentState là null nên kiểm tra thẳng.
+    final form = formKey.currentState;
+    if (form == null) {
+      final error = validateVoucherCode(voucher.text);
+      if (error != null) {
+        showError(context, error);
+        return;
+      }
+    } else if (!form.validate()) {
+      return;
+    }
     if (!await confirm(
           context,
           'Tạo đơn và giữ tồn kho cho các sản phẩm trong giỏ?',
@@ -144,6 +155,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             decoration: const InputDecoration(
                               labelText: 'Mã voucher (nếu có)',
                               helperText: 'API sẽ kiểm tra điều kiện voucher khi tạo đơn.',
+                              helperMaxLines: 2,
                             ),
                           ),
                         ),
@@ -154,10 +166,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       title: 'Tóm tắt',
                       children: [
                         Row(
+                          spacing: 12,
                           children: [
                             const Text('Tạm tính'),
-                            const Spacer(),
-                            Text(money(widget.subtotalVnd)),
+                            Expanded(
+                              child: Text(
+                                money(widget.subtotalVnd),
+                                textAlign: TextAlign.end,
+                              ),
+                            ),
                           ],
                         ),
                         Text(
@@ -279,7 +296,8 @@ class _Section extends StatelessWidget {
                 Expanded(
                   child: Text(title, style: theme.textTheme.titleMedium),
                 ),
-                ?trailing, // Chỉ thêm khi có nút phụ.
+                // Chỉ thêm khi có nút phụ; Flexible để màn hẹp không bị tràn.
+                if (trailing case final action?) Flexible(child: action),
               ],
             ),
             ...children,

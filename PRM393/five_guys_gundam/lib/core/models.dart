@@ -4,6 +4,14 @@ List<Json> asJsonList(dynamic value) => (value as List).map(asJson).toList();
 List<Json> pageItems(dynamic value) => asJsonList(asJson(value)['items']);
 int asInt(dynamic value) => (value as num).toInt();
 
+// API lưu giờ UTC nhưng trả về không kèm "Z" (EF đọc SQL Server ra Kind=Unspecified).
+// DateTime.parse sẽ hiểu chuỗi thiếu múi giờ là giờ máy, nên ép về UTC.
+final _hasZone = RegExp(r'T.*(Z|[+-]\d\d(:?\d\d)?)$', caseSensitive: false);
+DateTime asUtcDate(dynamic value) {
+  final text = value as String;
+  return DateTime.parse(_hasZone.hasMatch(text) ? text : '${text}Z');
+}
+
 class ShopUser {
   ShopUser.fromJson(Json j)
     : id = j['id'] as String,
@@ -111,15 +119,18 @@ class OrderLine {
 class ShopOrder {
   ShopOrder.fromJson(Json j)
     : id = j['id'] as String,
+      userId = j['userId'] as String?,
       status = j['status'] as String,
       paymentStatus = j['paymentStatus'] as String,
       subtotalVnd = asInt(j['subtotalVnd']),
       discountVnd = asInt(j['discountVnd']),
       totalVnd = asInt(j['totalVnd']),
-      createdAtUtc = DateTime.parse(j['createdAtUtc'] as String),
-      expiresAtUtc = DateTime.parse(j['expiresAtUtc'] as String),
+      createdAtUtc = asUtcDate(j['createdAtUtc']),
+      expiresAtUtc = asUtcDate(j['expiresAtUtc']),
       items = asJsonList(j['items']).map(OrderLine.fromJson).toList();
   final String id, status, paymentStatus;
+  // Chủ đơn; null nếu backend cũ chưa trả trường này.
+  final String? userId;
   final int subtotalVnd, discountVnd, totalVnd;
   final DateTime createdAtUtc, expiresAtUtc;
   final List<OrderLine> items;

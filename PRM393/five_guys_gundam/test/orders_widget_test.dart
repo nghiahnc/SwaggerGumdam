@@ -3,9 +3,15 @@ import 'package:five_guys_gundam/screens/orders.dart';
 
 import 'test_helpers.dart';
 
-// Đơn giả theo đúng OrderDTO của backend.
-Map<String, Object> order(String id, String status, String paymentStatus) => {
+// Đơn giả theo đúng OrderDTO của backend; mặc định thuộc user test 'u1'.
+Map<String, Object> order(
+  String id,
+  String status,
+  String paymentStatus, {
+  String userId = 'u1',
+}) => {
   'id': id,
+  'userId': userId,
   'status': status,
   'paymentStatus': paymentStatus,
   'subtotalVnd': 700000,

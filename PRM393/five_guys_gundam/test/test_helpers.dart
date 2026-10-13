@@ -12,16 +12,20 @@ import 'package:provider/provider.dart';
 
 // Repository và ApiClient thật, chỉ thay mạng bằng MockClient: không gọi API thật.
 // Khóa của [responses] là "METHOD /path" (không gồm query string).
-// Mỗi request được ghi lại vào [requests] để kiểm tra app có gửi đi hay không.
+// Mỗi request được ghi lại vào [requests] để kiểm tra app có gửi đi hay không;
+// [bodies] giữ body JSON gần nhất theo cùng khóa.
 Future<void> pumpScreen(
   WidgetTester tester,
   Widget screen,
   Map<String, Object> responses, {
   List<String>? requests,
+  Map<String, Object?>? bodies,
   String role = 'Customer',
+  bool signedIn = true,
+  // Mặc định cao để ListView dựng đủ mọi phần tử, kể cả nút ở cuối.
+  Size size = const Size(800, 2000),
 }) async {
-  // Màn hình test cao để ListView dựng đủ mọi phần tử, kể cả nút ở cuối.
-  tester.view.physicalSize = const Size(800, 2000);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 
@@ -29,6 +33,11 @@ Future<void> pumpScreen(
     baseUrl: 'http://example.test',
     client: MockClient((request) async {
       requests?.add('${request.method} ${request.url.path}');
+      if (request.body.isNotEmpty) {
+        bodies?['${request.method} ${request.url.path}'] = jsonDecode(
+          request.body,
+        );
+      }
       final body = responses['${request.method} ${request.url.path}'];
       if (body == null) return http.Response('', 404);
       if (body is http.Response) return body; // Lỗi dựng sẵn, ví dụ 409.
@@ -40,12 +49,14 @@ Future<void> pumpScreen(
     }),
   );
   final session = SessionController(api)
-    ..user = ShopUser.fromJson({
-      'id': 'u1',
-      'email': 'test@gundam.local',
-      'fullName': 'Người dùng Test',
-      'role': role,
-    });
+    ..user = signedIn
+        ? ShopUser.fromJson({
+            'id': 'u1',
+            'email': 'test@gundam.local',
+            'fullName': 'Người dùng Test',
+            'role': role,
+          })
+        : null;
   await tester.pumpWidget(
     MultiProvider(
       providers: [
