@@ -18,7 +18,9 @@ class ShopRepository {
           .map(Product.fromJson)
           .toList();
 
-  Future<List<ProductSearchHit>> searchProducts({
+  static const catalogPageSize = 20;
+
+  Future<ProductSearchPage> searchProducts({
     String query = '',
     String? grade,
     int skip = 0,
@@ -33,14 +35,17 @@ class ShopRepository {
     }
     final parameters = <String, String>{
       r'$orderby': 'Name',
-      r'$top': '20',
+      r'$top': '$catalogPageSize',
       r'$skip': '$skip',
       r'$count': 'true',
       if (filters.isNotEmpty) r'$filter': filters.join(' and '),
     };
     final path = '/odata/Products?${Uri(queryParameters: parameters).query}';
-    final data = asJson(await api.request('GET', path));
-    return asJsonList(data['value']).map(ProductSearchHit.fromJson).toList();
+    return ProductSearchPage.fromJson(
+      asJson(await api.request('GET', path)),
+      skip: skip,
+      pageSize: catalogPageSize,
+    );
   }
 
   Future<Product> product(String id) async => Product.fromJson(

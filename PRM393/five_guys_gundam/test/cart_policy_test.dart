@@ -8,4 +8,10 @@ void main() {
     expect(validateQuantity(100, 500), contains('1 đến 99'));
     expect(validateQuantity(4, 3), contains('vượt tồn kho'));
   });
+
+  test('max quantity follows stock and caps at 99', () {
+    expect(maxQuantity(0), 0);
+    expect(maxQuantity(3), 3);
+    expect(maxQuantity(500), 99);
+  });
 }
