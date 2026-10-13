@@ -17,18 +17,22 @@ public class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExceptionMi
         try { await next(context); }
         catch (Exception ex)
         {
-            var status = ex switch
+            var (status, title) = ex switch
             {
-                ShopException e => e.Status,
-                DbUpdateConcurrencyException => 409,
-                DbUpdateException => 409,
-                OverflowException => 400,
-                _ => 500
+                ShopException e => (e.Status, e.Message),
+                // JSON hỏng, sai kiểu, query không parse được: lỗi phía client, không phải 500.
+                BadHttpRequestException e => (e.StatusCode, "Dữ liệu gửi lên không hợp lệ."),
+                // Xung đột ghi/deadlock giữa các transaction Serializable; EF có thể bọc trong InvalidOperationException.
+                DbUpdateException or InvalidOperationException { InnerException: DbUpdateException }
+                    => (409, "Dữ liệu vừa được yêu cầu khác thay đổi. Hãy tải lại và thử lại."),
+                OverflowException => (400, "Giá trị vượt quá giới hạn cho phép."),
+                _ => (500, "Lỗi máy chủ")
             };
             if (status == 500) logger.LogError(ex, "Unhandled API error");
+            else if (status == 409 && ex is not ShopException) logger.LogWarning(ex, "Database write conflict");
             context.Response.StatusCode = status;
             context.Response.ContentType = "application/problem+json";
-            await context.Response.WriteAsJsonAsync(new ProblemDetails { Status = status, Title = status == 500 ? "Lỗi máy chủ" : ex.Message });
+            await context.Response.WriteAsJsonAsync(new ProblemDetails { Status = status, Title = title });
         }
     }
 }
