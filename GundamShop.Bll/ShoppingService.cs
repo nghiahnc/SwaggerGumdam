@@ -40,13 +40,13 @@ public class ShoppingService(ShopDbContext db)
 
     public Task<Page<OrderDto>> Orders(Guid userId, int page, int size, bool admin = false) => PageHelper.GetAsync(db.Orders.AsNoTracking()
         .Where(o => admin || o.UserId == userId).OrderByDescending(o => o.CreatedAtUtc)
-        .Select(o => new OrderDto(o.Id, o.Status, o.PaymentStatus, o.SubtotalVnd, o.DiscountVnd, o.TotalVnd, o.CreatedAtUtc, o.ExpiresAtUtc,
+        .Select(o => new OrderDto(o.Id, o.UserId, o.Status, o.PaymentStatus, o.SubtotalVnd, o.DiscountVnd, o.TotalVnd, o.CreatedAtUtc, o.ExpiresAtUtc,
             o.Items.Select(i => new OrderItemDto(i.VariantId, i.ProductName, i.Sku, i.UnitPriceVnd, i.Quantity)).ToList())), page, size);
 
     public async Task<OrderDto> Order(Guid userId, Guid id, bool admin = false)
     {
         var x = ShopGuard.Found(await db.Orders.AsNoTracking().Where(o => o.Id == id && (admin || o.UserId == userId))
-            .Select(o => new OrderDto(o.Id, o.Status, o.PaymentStatus, o.SubtotalVnd, o.DiscountVnd, o.TotalVnd, o.CreatedAtUtc, o.ExpiresAtUtc,
+            .Select(o => new OrderDto(o.Id, o.UserId, o.Status, o.PaymentStatus, o.SubtotalVnd, o.DiscountVnd, o.TotalVnd, o.CreatedAtUtc, o.ExpiresAtUtc,
                 o.Items.Select(i => new OrderItemDto(i.VariantId, i.ProductName, i.Sku, i.UnitPriceVnd, i.Quantity)).ToList())).FirstOrDefaultAsync(), "đơn hàng");
         return x;
     }
