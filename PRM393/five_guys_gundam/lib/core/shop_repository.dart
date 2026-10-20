@@ -54,9 +54,13 @@ class ShopRepository {
   Future<List<Variant>> variants(String id) async => pageItems(
     await api.request('GET', '/api/v1/products/$id/variants?pageSize=100'),
   ).map(Variant.fromJson).toList();
-  Future<List<Review>> reviews(String id) async => pageItems(
-    await api.request('GET', '/api/v1/products/$id/reviews?pageSize=100'),
-  ).map(Review.fromJson).toList();
+
+  /// Every review of the product: the own review and the average must not
+  /// depend on whether it is among the newest 100.
+  Future<List<Review>> reviews(String id) async =>
+      (await _allPages('/api/v1/products/$id/reviews'))
+          .map(Review.fromJson)
+          .toList();
 
   Future<List<Address>> addresses() async =>
       asJsonList(await api.request('GET', '/api/v1/addresses'))
@@ -176,10 +180,13 @@ class ShopRepository {
         ),
       );
 
+  /// Every voucher, stopped ones included (they stay in the API's list), so
+  /// a new code that sorts late still appears.
   Future<List<Voucher>> vouchers() async =>
-      pageItems(await api.request('GET', '/api/v1/vouchers?pageSize=100'))
-          .map(Voucher.fromJson)
-          .toList();
+      (await _allPages('/api/v1/vouchers')).map(Voucher.fromJson).toList();
+  Future<Voucher> voucher(String id) async => Voucher.fromJson(
+    asJson(await api.request('GET', '/api/v1/vouchers/$id')),
+  );
   Future<Voucher> saveVoucher(Json body, {String? id}) async =>
       Voucher.fromJson(
         asJson(
@@ -203,4 +210,39 @@ class ShopRepository {
   );
   Future<void> deleteReview(String id) async =>
       api.request('DELETE', '/api/v1/reviews/$id');
+
+  /// Reads a paged list to the end. The API serves at most 100 items a page
+  /// and reports the total in `totalCount`; the page cap stops a loop if the
+  /// total and the pages ever disagree.
+  ///
+  /// Pages are offsets, so a row added or removed between two requests
+  /// shifts the later pages: items are kept by id (no row twice), and when
+  /// the total changed during the read it starts over once.
+  Future<List<Json>> _allPages(String path) async {
+    const pageSize = 100, maxPages = 100;
+    for (var attempt = 1; ; attempt++) {
+      final byId = <Object?, Json>{};
+      Object? firstTotal;
+      var changed = false;
+      for (var page = 1; page <= maxPages; page++) {
+        final data = asJson(
+          await api.request('GET', '$path?page=$page&pageSize=$pageSize'),
+        );
+        final batch = asJsonList(data['items']);
+        final total = data['totalCount'];
+        if (page == 1) {
+          firstTotal = total;
+        } else if (total != firstTotal) {
+          changed = true;
+        }
+        for (final item in batch) {
+          byId[item['id']] = item;
+        }
+        if (batch.length < pageSize || (total is num && byId.length >= total)) {
+          break;
+        }
+      }
+      if (!changed || attempt == 2) return byId.values.toList();
+    }
+  }
 }
