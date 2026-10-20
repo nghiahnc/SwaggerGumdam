@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:five_guys_gundam/core/models.dart';
+import 'package:five_guys_gundam/core/order_status.dart';
 import 'package:five_guys_gundam/core/payment_policy.dart';
 import 'package:five_guys_gundam/core/review_policy.dart';
 
@@ -62,6 +63,24 @@ void main() {
       expect(PaymentPolicy.orderStatus('Unknown'), 'Unknown');
     });
 
+    test('order states read the same as on the order screens', () {
+      for (final status in [
+        'PendingPayment',
+        'Paid',
+        'PaymentFailed',
+        'Shipped',
+        'Delivered',
+        'Cancelled',
+        'Expired',
+      ]) {
+        expect(
+          PaymentPolicy.orderStatus(status),
+          orderStatusLabel(status),
+          reason: status,
+        );
+      }
+    });
+
     test('both mock results are explained', () {
       expect(PaymentPolicy.succeeded('Paid'), isTrue);
       expect(
@@ -73,6 +92,32 @@ void main() {
         PaymentPolicy.outcome('PaymentFailed'),
         contains('tồn kho và lượt voucher'),
       );
+    });
+
+    test('money that reached a closed order is reported as a refund', () {
+      for (final status in ['Cancelled', 'Expired', 'PaymentFailed']) {
+        final text = PaymentPolicy.outcome(
+          status,
+          paymentStatus: 'RefundRequired',
+        );
+        expect(text, contains('đã nhận tiền'), reason: status);
+        expect(text, contains('đơn đã đóng'), reason: status);
+        expect(text, isNot(contains('tạo đơn mới')), reason: status);
+        expect(
+          PaymentPolicy.statusLabel(status, paymentStatus: 'RefundRequired'),
+          'Cần hoàn tiền',
+        );
+        expect(
+          PaymentPolicy.succeeded(status, paymentStatus: 'RefundRequired'),
+          isFalse,
+        );
+      }
+      expect(
+        PaymentPolicy.statusLabel('Paid', paymentStatus: 'Paid'),
+        'Đã thanh toán',
+      );
+      expect(PaymentPolicy.needsRefund('Pending'), isFalse);
+      expect(PaymentPolicy.needsRefund(null), isFalse);
     });
   });
 }

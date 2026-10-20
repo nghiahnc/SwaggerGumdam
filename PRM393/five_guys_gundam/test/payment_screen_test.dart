@@ -39,6 +39,21 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// The app goes to the background (the browser opens) and comes back,
+  /// through every state a real device passes.
+  void leaveAndReturn(WidgetTester tester) {
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+  }
+
   void mockApiResult({required bool succeeded}) =>
       fake.onRequest('POST', mockPath, (_) {
         status = succeeded ? 'Paid' : 'PaymentFailed';
@@ -49,7 +64,8 @@ void main() {
     tester,
   ) async {
     await open(tester);
-    expect(find.text('Đơn order-00'), findsOneWidget);
+    // Same short form as the order screens ("#48A8D86D").
+    expect(find.text('Đơn #ORDER-00'), findsOneWidget);
     expect(find.text('Cần thanh toán: 350.000 ₫'), findsOneWidget);
     expect(find.text('Chờ thanh toán'), findsOneWidget);
     expect(find.byKey(const Key('mock-success')), findsOneWidget);
@@ -92,6 +108,143 @@ void main() {
     await open(tester);
     expect(fake.calls, isNot(contains('POST $sessionPath')));
     expect(find.textContaining('Thanh toán thành công'), findsOneWidget);
+    // Nothing is left to pay, so the amount is the order total.
+    expect(find.text('Tổng đơn: 350.000 ₫'), findsOneWidget);
+    expect(find.textContaining('Cần thanh toán'), findsNothing);
+  });
+
+  for (final closed in ['Cancelled', 'Expired', 'PaymentFailed']) {
+    testWidgets('money taken after the order became $closed: a refund is due', (
+      tester,
+    ) async {
+      fake.on(
+        'GET',
+        orderPath,
+        orderJson(id: orderId, status: closed, paymentStatus: 'RefundRequired'),
+      );
+      await open(tester);
+      expect(find.byKey(const Key('outcome-refund')), findsOneWidget);
+      expect(find.textContaining('hoàn lại thủ công'), findsOneWidget);
+      expect(find.textContaining('không thanh toán lại'), findsOneWidget);
+      // None of the closed-order messages, which would hide the payment.
+      expect(find.textContaining('Hãy tạo đơn mới'), findsNothing);
+      expect(find.textContaining('không thể thanh toán'), findsNothing);
+      expect(find.textContaining('Thanh toán thất bại.'), findsNothing);
+      expect(find.text('Tổng đơn: 350.000 ₫'), findsOneWidget);
+      // The chip names the refund, not the closed status next to it.
+      expect(find.text('Cần hoàn tiền'), findsOneWidget);
+      for (final label in ['Đã hủy', 'Đã hết hạn', 'Thanh toán thất bại']) {
+        expect(find.text(label), findsNothing, reason: label);
+      }
+    });
+  }
+
+  testWidgets('coming back from Stripe Checkout reads the order again', (
+    tester,
+  ) async {
+    fake.on('POST', sessionPath, {
+      'orderId': orderId,
+      'provider': 'Stripe',
+      'status': 'Pending',
+      'checkoutUrl': 'https://checkout.stripe.com/c/pay/test',
+    });
+    await tester.pumpWidget(
+      fake.wrap(PaymentScreen(orderId: orderId, openUrl: (_) async => true)),
+    );
+    await tester.pumpAndSettle();
+
+    // Switching apps before Checkout was opened reads nothing.
+    leaveAndReturn(tester);
+    await tester.pumpAndSettle();
+    expect(fake.count('GET $orderPath'), 1);
+
+    await tester.tap(find.byKey(const Key('stripe-open')));
+    await tester.pumpAndSettle();
+    // Back without paying yet: read quietly, no repeated snackbar.
+    leaveAndReturn(tester);
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    await tester.pumpAndSettle();
+    expect(fake.count('GET $orderPath'), 2);
+    expect(find.textContaining('Chưa nhận được kết quả'), findsNothing);
+    expect(find.byKey(const Key('stripe-open')), findsOneWidget);
+
+    status = 'Paid'; // the webhook arrived while the customer was on Stripe
+    leaveAndReturn(tester);
+    await tester.pumpAndSettle();
+    expect(fake.count('GET $orderPath'), 3);
+    expect(find.text('Đã thanh toán'), findsOneWidget);
+
+    // Once the order is settled, focusing the app again reads nothing.
+    leaveAndReturn(tester);
+    await tester.pumpAndSettle();
+    expect(fake.count('GET $orderPath'), 3);
+  });
+
+  testWidgets('an older quiet refresh does not replace a newer reload', (
+    tester,
+  ) async {
+    fake.on('POST', sessionPath, {
+      'orderId': orderId,
+      'provider': 'Stripe',
+      'status': 'Pending',
+      'checkoutUrl': 'https://checkout.stripe.com/c/pay/test',
+    });
+    final slow = Completer<void>();
+    var reads = 0;
+    fake.onRequest('GET', orderPath, (_) async {
+      reads++;
+      final now = status;
+      if (reads == 2) await slow.future; // the read started on return
+      return FakeShopApi.json(orderJson(id: orderId, status: now));
+    });
+    await tester.pumpWidget(
+      fake.wrap(PaymentScreen(orderId: orderId, openUrl: (_) async => true)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stripe-open')));
+    await tester.pumpAndSettle();
+
+    leaveAndReturn(tester); // read 2 starts while the order is still pending
+    await tester.pump();
+    status = 'Paid';
+    await tester.tap(find.byTooltip('Tải lại trạng thái')); // read 3
+    await tester.pumpAndSettle();
+    expect(find.text('Đã thanh toán'), findsOneWidget);
+
+    slow.complete(); // read 2 answers late with the pending order
+    await tester.pumpAndSettle();
+    expect(find.text('Đã thanh toán'), findsOneWidget);
+    expect(find.text('Chờ thanh toán'), findsNothing);
+  });
+
+  testWidgets('a refused session does not stop reading on return', (
+    tester,
+  ) async {
+    fake.on('POST', sessionPath, {
+      'orderId': orderId,
+      'provider': 'Stripe',
+      'status': 'Pending',
+      'checkoutUrl': 'https://checkout.stripe.com/c/pay/test',
+    });
+    await tester.pumpWidget(
+      fake.wrap(PaymentScreen(orderId: orderId, openUrl: (_) async => true)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stripe-open')));
+    await tester.pumpAndSettle();
+
+    // A passing failure: the order still waits, only the session call fails.
+    fake.refuse('POST', sessionPath, 503, 'Stripe tạm lỗi.');
+    leaveAndReturn(tester);
+    await tester.pumpAndSettle();
+    expect(fake.count('GET $orderPath'), 2);
+
+    status = 'Paid';
+    leaveAndReturn(tester);
+    await tester.pumpAndSettle();
+    expect(fake.count('GET $orderPath'), 3);
+    expect(find.text('Đã thanh toán'), findsOneWidget);
   });
 
   testWidgets('a refused mock call is reported and the status is reloaded', (
@@ -152,8 +305,18 @@ void main() {
       }, status: 409);
     });
     await open(tester);
-    expect(find.text('Hết hạn thanh toán'), findsOneWidget);
+    expect(find.text('Đã hết hạn'), findsOneWidget);
     expect(find.textContaining('quá hạn thanh toán'), findsOneWidget);
+  });
+
+  testWidgets('an order id shorter than 8 characters is shown whole', (
+    tester,
+  ) async {
+    fake.on('GET', '/api/v1/orders/a1', orderJson(id: 'a1', status: 'Paid'));
+    await tester.pumpWidget(fake.wrap(const PaymentScreen(orderId: 'a1')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Đơn #A1'), findsOneWidget);
   });
 
   testWidgets('a refused session keeps the order on screen with the reason', (
