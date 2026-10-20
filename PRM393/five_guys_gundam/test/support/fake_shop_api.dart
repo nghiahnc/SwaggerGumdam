@@ -145,12 +145,13 @@ Json reviewJson({
 Json orderJson({
   String id = 'order-0001-aaaa',
   String status = 'PendingPayment',
+  String? paymentStatus,
   int subtotalVnd = 350000,
   int discountVnd = 0,
 }) => {
   'id': id,
   'status': status,
-  'paymentStatus': status == 'Paid' ? 'Paid' : 'Pending',
+  'paymentStatus': paymentStatus ?? (status == 'Paid' ? 'Paid' : 'Pending'),
   'subtotalVnd': subtotalVnd,
   'discountVnd': discountVnd,
   'totalVnd': subtotalVnd - discountVnd,

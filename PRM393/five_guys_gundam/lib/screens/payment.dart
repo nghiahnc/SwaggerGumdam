@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -8,6 +9,7 @@ import '../core/models.dart';
 import '../core/payment_policy.dart';
 import '../core/shop_repository.dart';
 import '../widgets/common.dart';
+import 'orders.dart' show shortOrderId;
 
 /// Pays one order that is waiting for payment.
 ///
@@ -46,10 +48,54 @@ class _PaymentScreenState extends State<PaymentScreen> {
   /// True while a mock result is being sent; locks both buttons.
   bool busy = false;
 
+  /// Set once Stripe Checkout was opened in the browser: coming back to the
+  /// app then reads the order again, as the Stripe text asks the customer to.
+  /// Cleared when the order is no longer pending.
+  bool _awaitingStripe = false;
+  bool _refreshing = false;
+  late final AppLifecycleListener _lifecycle;
+
   @override
   void initState() {
     super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _backFromStripe);
     reload();
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  /// On web and desktop "resume" also fires on every window focus, so this
+  /// refresh is quiet: the screen keeps what it shows until the new answer
+  /// arrives, and no snackbar repeats (the button still gives one).
+  Future<void> _backFromStripe() async {
+    if (!_awaitingStripe || !mounted || busy || _refreshing) return;
+    _refreshing = true;
+    final shown = future;
+    final load = readable(_load(context.read<ShopRepository>()));
+    try {
+      final view = await load;
+      // A reload the customer asked for meanwhile is newer: keep it.
+      if (!mounted || !identical(future, shown)) return;
+      _settleStripe(view);
+      setState(() {
+        future = SynchronousFuture(view);
+      });
+    } catch (_) {
+      // Keep the current view; the reload button shows the error.
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  /// Stops reading on resume once the order itself is no longer waiting for
+  /// payment. A refused session (no session in the view) is not enough: the
+  /// order may still be pending and Stripe may still report back.
+  void _settleStripe(_PaymentView view) {
+    if (view.order.status != PaymentPolicy.pending) _awaitingStripe = false;
   }
 
   void reload() {
@@ -126,6 +172,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     } catch (_) {
       return; // the error panel already explains it
     }
+    _settleStripe(view);
     if (view.pending && messenger.mounted) {
       messenger
         ..hideCurrentSnackBar()
@@ -149,6 +196,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           await (widget.openUrl?.call(uri) ??
               launchUrl(uri, mode: LaunchMode.externalApplication));
     } catch (_) {}
+    if (opened) _awaitingStripe = true;
     if (!opened && messenger.mounted) {
       messenger
         ..hideCurrentSnackBar()
@@ -195,10 +243,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               )
             else if (!view.pending)
-              _Outcome(
-                status: view.order.status,
-                onBack: () => Navigator.pop(context),
-              )
+              _Outcome(order: view.order, onBack: () => Navigator.pop(context))
             else if (view.session!['provider'] == 'Mock')
               _MockActions(busy: busy, onResult: completeMock)
             else if (view.session!['checkoutUrl'] is String)
@@ -232,7 +277,7 @@ class _OrderSummary extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Đơn ${order.id.substring(0, 8)}',
+              'Đơn ${shortOrderId(order.id)}',
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -240,13 +285,20 @@ class _OrderSummary extends StatelessWidget {
             if (order.discountVnd > 0)
               Text('Giảm giá: ${money(order.discountVnd)}'),
             Text(
-              'Cần thanh toán: ${money(order.totalVnd)}',
+              order.status == PaymentPolicy.pending
+                  ? 'Cần thanh toán: ${money(order.totalVnd)}'
+                  : 'Tổng đơn: ${money(order.totalVnd)}',
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Chip(
               key: const Key('order-status'),
-              label: Text(PaymentPolicy.orderStatus(order.status)),
+              label: Text(
+                PaymentPolicy.statusLabel(
+                  order.status,
+                  paymentStatus: order.paymentStatus,
+                ),
+              ),
               visualDensity: VisualDensity.compact,
             ),
           ],
@@ -318,25 +370,42 @@ class _StripeActions extends StatelessWidget {
 }
 
 class _Outcome extends StatelessWidget {
-  const _Outcome({required this.status, required this.onBack});
-  final String status;
+  const _Outcome({required this.order, required this.onBack});
+  final ShopOrder order;
   final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
-    final ok = PaymentPolicy.succeeded(status);
+    final status = order.status, paid = order.paymentStatus;
+    final ok = PaymentPolicy.succeeded(status, paymentStatus: paid);
+    final refund = PaymentPolicy.needsRefund(paid);
     final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Icon(
-          ok ? Icons.check_circle : Icons.error_outline,
+          ok
+              ? Icons.check_circle
+              : refund
+              ? Icons.report_outlined
+              : Icons.error_outline,
+          key: Key(
+            ok
+                ? 'outcome-ok'
+                : refund
+                ? 'outcome-refund'
+                : 'outcome-failed',
+          ),
           size: 56,
-          color: ok ? Colors.green.shade700 : scheme.error,
+          color: ok
+              ? Colors.green.shade700
+              : refund
+              ? Colors.orange.shade800
+              : scheme.error,
         ),
         const SizedBox(height: 12),
         Text(
-          PaymentPolicy.outcome(status),
+          PaymentPolicy.outcome(status, paymentStatus: paid),
           key: const Key('payment-outcome'),
           textAlign: TextAlign.center,
         ),
