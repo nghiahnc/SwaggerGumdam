@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../core/dates.dart';
@@ -60,17 +61,39 @@ class _VouchersScreenState extends State<VouchersScreen> {
   Future<void> edit([Voucher? old]) async {
     // Taken before any await: the list is rebuilt while the dialog is open.
     final messenger = ScaffoldMessenger.of(context);
+    if (old != null) {
+      // The list may be minutes old; a checkout since then decides whether
+      // the code can still change. If the read fails, the list copy is used.
+      final repository = context.read<ShopRepository>();
+      setState(() => busy = true);
+      var fresh = old;
+      try {
+        fresh = await repository.voucher(old.id);
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() => busy = false);
+      // Stopped by another admin since the list loaded: nothing to edit.
+      if (!fresh.isActive) {
+        _show(messenger, 'Voucher ${fresh.code} đã ngừng sử dụng');
+        reload();
+        return;
+      }
+      old = fresh;
+    }
+    final current = old;
     final code = await showDialog<String>(
       context: context,
       // A tap beside the dialog must not throw away what was typed.
       barrierDismissible: false,
-      builder: (_) =>
-          VoucherDialog(old: old, onSubmit: (input) => save(input, old)),
+      builder: (_) => VoucherDialog(
+        old: current,
+        onSubmit: (input) => save(input, current),
+      ),
     );
     if (code == null) return;
     _show(
       messenger,
-      old == null ? 'Đã thêm voucher $code' : 'Đã cập nhật voucher $code',
+      current == null ? 'Đã thêm voucher $code' : 'Đã cập nhật voucher $code',
     );
   }
 
@@ -152,6 +175,15 @@ class _VouchersScreenState extends State<VouchersScreen> {
                   // Leaves room for the floating button over the last card.
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
                   children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                      child: Text(
+                        'Lượt đã dùng tính cả đơn đang chờ thanh toán. Đơn bị '
+                        'hủy, hết hạn hoặc thanh toán thất bại sẽ trả lại lượt.',
+                        key: const Key('vouchers-usage-note'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
                     for (final voucher in items)
                       _VoucherCard(
                         voucher: voucher,
@@ -319,7 +351,24 @@ class _VoucherDialogState extends State<VoucherDialog> {
   @override
   void initState() {
     super.initState();
-    _code.addListener(() => setState(() {}));
+    // The code hint and the 0 ₫ warning follow what is typed.
+    for (final c in [_code, _discount, _minSubtotal]) {
+      c.addListener(() => setState(() {}));
+    }
+  }
+
+  /// Shown under the amounts when the voucher would make some orders free.
+  String? get _freeOrderWarning {
+    final discount = int.tryParse(_discount.text.trim());
+    final minimum = int.tryParse(_minSubtotal.text.trim());
+    if (discount == null || minimum == null) return null;
+    if (VoucherPolicy.discount(_discount.text) != null ||
+        VoucherPolicy.minSubtotal(_minSubtotal.text) != null) {
+      return null;
+    }
+    if (!VoucherPolicy.makesOrdersFree(discount, minimum)) return null;
+    return 'Lưu ý: đơn từ ${money(minimum)} đến ${money(discount)} sẽ được '
+        'giảm còn 0 ₫.';
   }
 
   @override
@@ -345,6 +394,21 @@ class _VoucherDialogState extends State<VoucherDialog> {
 
   static String _trim(String value) => value.trim();
 
+  /// Month and weekday names come from Material's own translations. The app's
+  /// MaterialApp only carries the English ones, so the pickers bring in the
+  /// Vietnamese set themselves.
+  static Widget _vietnamese(BuildContext context, Widget child) =>
+      Localizations.override(
+        context: context,
+        locale: const Locale('vi'),
+        delegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        child: child,
+      );
+
   Future<void> _pick({required bool start}) async {
     final current = start ? _starts : _ends;
     final date = await showDatePicker(
@@ -357,8 +421,12 @@ class _VoucherDialogState extends State<VoucherDialog> {
       cancelText: 'Hủy',
       confirmText: 'Chọn',
       fieldLabelText: 'Ngày',
+      // The Vietnamese set reads typed dates day first but keeps the English
+      // hint "mm/dd/yyyy"; following it would save the wrong day.
+      fieldHintText: 'dd/mm/yyyy',
       errorFormatText: 'Sai định dạng ngày',
       errorInvalidText: 'Ngày ngoài phạm vi',
+      builder: (context, child) => _vietnamese(context, child!),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
@@ -370,9 +438,12 @@ class _VoucherDialogState extends State<VoucherDialog> {
       hourLabelText: 'Giờ',
       minuteLabelText: 'Phút',
       // The form shows 24-hour times (dd/MM/yyyy HH:mm); so does the picker.
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
-        child: child!,
+      builder: (context, child) => _vietnamese(
+        context,
+        MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        ),
       ),
     );
     if (time == null || !mounted) return;
@@ -429,6 +500,8 @@ class _VoucherDialogState extends State<VoucherDialog> {
     final typed = _code.text;
     final normalized = VoucherPolicy.normalizeCode(typed);
     final period = _periodError;
+    final codeFixed = !VoucherPolicy.canChangeCode(widget.old);
+    final freeWarning = _freeOrderWarning;
     // While saving, closing would hide the outcome of a request in flight.
     return PopScope(
       canPop: !_saving,
@@ -451,13 +524,16 @@ class _VoucherDialogState extends State<VoucherDialog> {
                   key: const Key('voucher-code'),
                   controller: _code,
                   enabled: !_saving,
+                  readOnly: codeFixed,
                   maxLength: VoucherPolicy.codeMaxLength,
                   textCapitalization: TextCapitalization.characters,
                   decoration: InputDecoration(
                     labelText: 'Mã voucher',
                     errorMaxLines: 3,
                     helperMaxLines: 2,
-                    helperText: typed.isNotEmpty && typed != normalized
+                    helperText: codeFixed
+                        ? 'Đã có đơn dùng mã này nên không đổi được mã'
+                        : typed.isNotEmpty && typed != normalized
                         ? 'Sẽ lưu là $normalized'
                         : 'Khách nhập mã này khi đặt hàng',
                   ),
@@ -486,6 +562,15 @@ class _VoucherDialogState extends State<VoucherDialog> {
                     VoucherPolicy.minSubtotal,
                   ),
                 ),
+                if (freeWarning != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text(
+                      freeWarning,
+                      key: const Key('voucher-free-warning'),
+                      style: TextStyle(color: Colors.orange.shade800),
+                    ),
+                  ),
                 _number(
                   'voucher-max-uses',
                   _maxUses,
@@ -498,7 +583,8 @@ class _VoucherDialogState extends State<VoucherDialog> {
                     ),
                   ),
                   helper: _editing
-                      ? 'Đã dùng ${widget.old!.usedCount} lượt'
+                      ? 'Đã dùng ${widget.old!.usedCount} lượt (gồm đơn chờ '
+                            'thanh toán)'
                       : null,
                 ),
                 ListTile(

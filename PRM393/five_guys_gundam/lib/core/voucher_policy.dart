@@ -1,7 +1,8 @@
 import 'models.dart';
 
-// Checkout cho phép bỏ trống voucher; mã gửi tới API được chuẩn hóa.
-const voucherCodeMaxLength = 64;
+// Checkout cho phép bỏ trống voucher; mã gửi tới API được chuẩn hóa
+// giống form voucher của Admin (cùng độ dài tối đa, cùng cách viết hoa).
+const voucherCodeMaxLength = VoucherPolicy.codeMaxLength;
 
 String? validateVoucherCode(String? value) {
   final code = value?.trim() ?? '';
@@ -13,7 +14,7 @@ String? validateVoucherCode(String? value) {
 }
 
 String? normalizeVoucherCode(String? value) {
-  final code = value?.trim().toUpperCase() ?? '';
+  final code = VoucherPolicy.normalizeCode(value ?? '');
   return code.isEmpty ? null : code;
 }
 
@@ -109,6 +110,17 @@ abstract final class VoucherPolicy {
     if (!ends.isAfter(now)) return 'Thời gian kết thúc đã qua';
     return null;
   }
+
+  /// Checkout caps the discount at the order subtotal, so when the discount
+  /// reaches the minimum order every order from [minSubtotalVnd] up to
+  /// [discountVnd] costs 0 ₫ (and is marked paid at once with Stripe).
+  static bool makesOrdersFree(int discountVnd, int minSubtotalVnd) =>
+      discountVnd >= minSubtotalVnd;
+
+  /// Orders keep the voucher's id, not its code. Renaming a voucher that was
+  /// already used would turn the code customers know into "not found" and
+  /// free it for a different voucher, so the code is fixed after first use.
+  static bool canChangeCode(Voucher? old) => old == null || old.usedCount == 0;
 
   static VoucherState stateOf(Voucher voucher, DateTime now) {
     if (!voucher.isActive) return VoucherState.stopped;
