@@ -82,6 +82,28 @@ void main() {
     });
   });
 
+  group('business guards', () {
+    test('a discount that reaches the minimum order makes orders free', () {
+      expect(VoucherPolicy.makesOrdersFree(500000, 0), isTrue);
+      expect(VoucherPolicy.makesOrdersFree(50000, 50000), isTrue);
+      expect(VoucherPolicy.makesOrdersFree(50000, 50001), isFalse);
+    });
+
+    test('the code is fixed once a voucher has been used', () {
+      expect(VoucherPolicy.canChangeCode(null), isTrue);
+      expect(
+        VoucherPolicy.canChangeCode(Voucher.fromJson(voucherJson())),
+        isTrue,
+      );
+      expect(
+        VoucherPolicy.canChangeCode(
+          Voucher.fromJson(voucherJson(usedCount: 1)),
+        ),
+        isFalse,
+      );
+    });
+  });
+
   group('state, from the conditions checkout checks', () {
     final now = DateTime.utc(2026, 10, 10, 12);
     Voucher at({

@@ -240,7 +240,10 @@ void main() {
     );
     await open(tester);
     await chooseMenu(tester, 'v-used', 'Sửa');
-    expect(find.text('Đã dùng 5 lượt'), findsOneWidget);
+    expect(
+      find.text('Đã dùng 5 lượt (gồm đơn chờ thanh toán)'),
+      findsOneWidget,
+    );
     await tester.enterText(find.byKey(const Key('voucher-max-uses')), '3');
     await tester.tap(find.byKey(const Key('voucher-save')));
     await tester.pumpAndSettle();
@@ -327,5 +330,230 @@ void main() {
       );
       expect(field.decoration!.errorMaxLines, 3, reason: key);
     }
+  });
+
+  testWidgets('the date and time pickers are fully Vietnamese, 24-hour', (
+    tester,
+  ) async {
+    await open(tester);
+    await tester.tap(find.byKey(const Key('add-voucher')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('voucher-starts')));
+    await tester.pumpAndSettle();
+
+    // Month, weekdays and navigation come from Material's translations.
+    expect(find.textContaining(RegExp(r'^tháng \d+ năm \d{4}$')), findsWidgets);
+    expect(find.text('CN'), findsOneWidget);
+    expect(find.byTooltip('Tháng sau'), findsOneWidget);
+    expect(find.byTooltip('Next month'), findsNothing);
+
+    await tester.tap(find.text('Chọn'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chọn giờ'), findsOneWidget);
+    expect(
+      MediaQuery.alwaysUse24HourFormatOf(tester.element(find.text('Chọn giờ'))),
+      isTrue,
+    );
+    for (final period in ['AM', 'PM', 'SÁNG', 'CHIỀU']) {
+      expect(find.text(period), findsNothing, reason: period);
+    }
+  });
+
+  testWidgets('a typed date is read day first, as its hint says', (
+    tester,
+  ) async {
+    await open(tester);
+    await tester.tap(find.byKey(const Key('add-voucher')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('voucher-starts')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Chuyển sang chế độ nhập'));
+    await tester.pumpAndSettle();
+
+    final field = find.descendant(
+      of: find.byType(DatePickerDialog),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(field, '');
+    await tester.pump();
+    expect(find.text('dd/mm/yyyy'), findsOneWidget);
+
+    // 25 cannot be a month, so only a day-first reading accepts it.
+    await tester.enterText(field, '25/10/2027');
+    await tester.tap(find.text('Chọn'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Chọn'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sai định dạng ngày'), findsNothing);
+    expect(find.textContaining('25/10/2027'), findsOneWidget);
+  });
+
+  testWidgets('a discount that reaches the minimum warns about 0 ₫ orders', (
+    tester,
+  ) async {
+    await open(tester);
+    await tester.tap(find.byKey(const Key('add-voucher')));
+    await tester.pumpAndSettle();
+    // A typo (500000 for 50000) on a voucher without a minimum order.
+    await tester.enterText(find.byKey(const Key('voucher-discount')), '500000');
+    await tester.pump();
+    expect(
+      find.text('Lưu ý: đơn từ 0 ₫ đến 500.000 ₫ sẽ được giảm còn 0 ₫.'),
+      findsOneWidget,
+    );
+    await tester.enterText(
+      find.byKey(const Key('voucher-min-subtotal')),
+      '600000',
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('voucher-free-warning')), findsNothing);
+  });
+
+  testWidgets('the code of a voucher already used cannot be changed', (
+    tester,
+  ) async {
+    fake.on(
+      'GET',
+      '/api/v1/vouchers',
+      page([
+        voucherJson(id: 'v-used', code: 'USED', usedCount: 1),
+        voucherJson(id: 'v-new', code: 'FRESH'),
+      ]),
+    );
+    TextField codeField() => tester.widget<TextField>(
+      find.descendant(
+        of: find.byKey(const Key('voucher-code')),
+        matching: find.byType(TextField),
+      ),
+    );
+    await open(tester);
+    await chooseMenu(tester, 'v-used', 'Sửa');
+    expect(codeField().readOnly, isTrue);
+    expect(
+      find.text('Đã có đơn dùng mã này nên không đổi được mã'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Hủy'));
+    await tester.pumpAndSettle();
+
+    await chooseMenu(tester, 'v-new', 'Sửa');
+    expect(codeField().readOnly, isFalse);
+  });
+
+  testWidgets('the code lock reads the voucher as it is now, not the list', (
+    tester,
+  ) async {
+    // Listed unused, but a customer checked out with it since.
+    fake.on('GET', '/api/v1/vouchers', page([voucherJson(id: 'v-1')]));
+    fake.on(
+      'GET',
+      '/api/v1/vouchers/v-1',
+      voucherJson(id: 'v-1', usedCount: 1),
+    );
+    await open(tester);
+    await chooseMenu(tester, 'v-1', 'Sửa');
+    expect(fake.calls, contains('GET /api/v1/vouchers/v-1'));
+    final field = tester.widget<TextField>(
+      find.descendant(
+        of: find.byKey(const Key('voucher-code')),
+        matching: find.byType(TextField),
+      ),
+    );
+    expect(field.readOnly, isTrue);
+    expect(
+      find.text('Đã dùng 1 lượt (gồm đơn chờ thanh toán)'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('the list says that unpaid orders hold uses', (tester) async {
+    await open(tester);
+    expect(
+      find.textContaining('tính cả đơn đang chờ thanh toán'),
+      findsOneWidget,
+    );
+  });
+
+  test('vouchers beyond the first 100 are read too', () async {
+    fake.onRequest('GET', '/api/v1/vouchers', (request) {
+      final pageNumber = int.parse(request.url.queryParameters['page']!);
+      final items = pageNumber == 1
+          ? [
+              for (var i = 0; i < 100; i++)
+                voucherJson(id: 'v-$i', code: 'A${'$i'.padLeft(3, '0')}'),
+            ]
+          : [voucherJson(id: 'v-last', code: 'ZZZ-LAST')];
+      return FakeShopApi.json({
+        'items': items,
+        'pageNumber': pageNumber,
+        'pageSize': 100,
+        'totalCount': 101,
+      });
+    });
+    final vouchers = await fake.repository.vouchers();
+    expect(vouchers, hasLength(101));
+    expect(vouchers.last.code, 'ZZZ-LAST');
+    expect(
+      [for (final r in fake.requests) r.url.queryParameters['page']],
+      ['1', '2'],
+    );
+  });
+
+  test(
+    'a voucher added between two pages: read again, no duplicates',
+    () async {
+      var created = false;
+      fake.onRequest('GET', '/api/v1/vouchers', (request) {
+        final pageNumber = int.parse(request.url.queryParameters['page']!);
+        // A new code that sorts first appears right after page 1 was read.
+        final all = [
+          if (created) voucherJson(id: 'v-aaa', code: 'AAA'),
+          for (var i = 0; i < 150; i++)
+            voucherJson(id: 'v-$i', code: 'B${'$i'.padLeft(3, '0')}'),
+        ];
+        final body = {
+          'items': all.skip((pageNumber - 1) * 100).take(100).toList(),
+          'pageNumber': pageNumber,
+          'pageSize': 100,
+          'totalCount': all.length,
+        };
+        created = true;
+        return FakeShopApi.json(body);
+      });
+      final vouchers = await fake.repository.vouchers();
+      final ids = vouchers.map((v) => v.id).toList();
+      expect(ids.toSet(), hasLength(ids.length));
+      expect(ids, hasLength(151));
+      expect(ids, contains('v-aaa'));
+    },
+  );
+
+  testWidgets('a voucher stopped since the list loaded is not edited', (
+    tester,
+  ) async {
+    fake.on('GET', '/api/v1/vouchers', page([voucherJson(id: 'v-1')]));
+    fake.on(
+      'GET',
+      '/api/v1/vouchers/v-1',
+      voucherJson(id: 'v-1', isActive: false),
+    );
+    await open(tester);
+    await chooseMenu(tester, 'v-1', 'Sửa');
+    expect(find.text('Sửa voucher'), findsNothing);
+    expect(find.text('Voucher SALE10 đã ngừng sử dụng'), findsOneWidget);
+    expect(fake.count(list), 2);
+  });
+
+  test('a full page without totalCount reads on until a short page', () async {
+    fake.onRequest('GET', '/api/v1/vouchers', (request) {
+      final pageNumber = int.parse(request.url.queryParameters['page']!);
+      return FakeShopApi.json({
+        'items': [
+          for (var i = 0; i < (pageNumber == 1 ? 100 : 3); i++)
+            voucherJson(id: 'v-$pageNumber-$i'),
+        ],
+      });
+    });
+    expect(await fake.repository.vouchers(), hasLength(103));
   });
 }
