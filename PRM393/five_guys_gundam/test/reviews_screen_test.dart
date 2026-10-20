@@ -284,4 +284,45 @@ void main() {
     expect(rows, hasLength(1));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('an admin is not offered to write a review', (tester) async {
+    fake.signIn(id: 'admin-1', role: 'Admin');
+    await open(tester);
+    expect(find.byKey(const Key('review-admin-note')), findsOneWidget);
+    expect(find.byKey(const Key('review-write')), findsNothing);
+  });
+
+  testWidgets('an admin who already has a review can still edit it', (
+    tester,
+  ) async {
+    stored = [...stored, reviewJson(id: 'r-admin', userId: 'admin-1')];
+    fake.signIn(id: 'admin-1', role: 'Admin');
+    await open(tester);
+    expect(find.byKey(const Key('review-edit-own')), findsOneWidget);
+    expect(find.byKey(const Key('review-admin-note')), findsNothing);
+  });
+
+  testWidgets('the own review is found beyond the newest 100', (tester) async {
+    fake.signIn(id: 'customer-1', role: 'Customer');
+    final all = [
+      for (var i = 0; i < 100; i++)
+        reviewJson(id: 'r-$i', userId: 'buyer-$i', rating: 4),
+      reviewJson(id: 'r-mine', userId: 'customer-1', rating: 2),
+    ];
+    fake.onRequest('GET', listPath, (request) {
+      final pageNumber = int.parse(request.url.queryParameters['page']!);
+      return FakeShopApi.json({
+        'items': all.skip((pageNumber - 1) * 100).take(100).toList(),
+        'pageNumber': pageNumber,
+        'pageSize': 100,
+        'totalCount': all.length,
+      });
+    });
+    await open(tester);
+    expect(fake.count('GET $listPath'), 2);
+    expect(find.text('Sửa đánh giá của bạn'), findsOneWidget);
+    expect(find.byKey(const Key('review-write')), findsNothing);
+    // The average and the count cover every review, not only the first 100.
+    expect(find.text('4,0 / 5 ★ · 101 đánh giá'), findsOneWidget);
+  });
 }

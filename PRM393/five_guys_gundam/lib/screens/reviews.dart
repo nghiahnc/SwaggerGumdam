@@ -165,6 +165,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                 const SizedBox(height: 8),
                 _WriteAction(
                   signedIn: session.isSignedIn,
+                  isAdmin: session.isAdmin,
                   own: own,
                   busy: busy,
                   onSignIn: signIn,
@@ -252,13 +253,14 @@ class _Summary extends StatelessWidget {
 class _WriteAction extends StatelessWidget {
   const _WriteAction({
     required this.signedIn,
+    required this.isAdmin,
     required this.own,
     required this.busy,
     required this.onSignIn,
     required this.onWrite,
     required this.onEditOwn,
   });
-  final bool signedIn, busy;
+  final bool signedIn, isAdmin, busy;
   final Review? own;
   final VoidCallback onSignIn, onWrite, onEditOwn;
 
@@ -278,6 +280,15 @@ class _WriteAction extends StatelessWidget {
         onPressed: busy ? null : onEditOwn,
         icon: const Icon(Icons.edit_outlined),
         label: const Text('Sửa đánh giá của bạn'),
+      );
+    }
+    // The API would accept a review from an admin who delivered an order to
+    // themself, which would read like a real buyer's; the shop only moderates.
+    if (isAdmin) {
+      return const Text(
+        'Tài khoản quản trị chỉ xóa được đánh giá của khách, không viết đánh '
+        'giá.',
+        key: Key('review-admin-note'),
       );
     }
     return FilledButton.icon(
