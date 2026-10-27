@@ -53,7 +53,21 @@ public static class ShopRoutes
         orders.MapGet("/", async (HttpContext h, int? page, int? pageSize, ShoppingService s) => Results.Ok(await s.Orders(h.UserId(), page ?? 1, pageSize ?? 20, h.User.IsInRole("Admin"))));
         orders.MapGet("/{id:guid}", async (HttpContext h, Guid id, ShoppingService s) => Results.Ok(await s.Order(h.UserId(), id, h.User.IsInRole("Admin"))));
         orders.MapPost("/", async (HttpContext h, CheckoutRequest i, ShoppingService s, PaymentService p) => Results.Created("/api/v1/orders", await s.Checkout(h.UserId(), i, p.Provider)));
-        orders.MapPost("/{id:guid}/cancel", async (HttpContext h, Guid id, ShoppingService s) => Results.Ok(await s.Cancel(h.UserId(), id, h.User.IsInRole("Admin"))));
+        orders.MapPost("/{id:guid}/cancel", async (HttpContext h, Guid id, ShoppingService s, PaymentService p) =>
+        {
+            var admin = h.User.IsInRole("Admin");
+            // Close an open Stripe Checkout page first, so it cannot take money for a cancelled order.
+            var closed = CheckoutClose.Closed;
+            if ((await s.Order(h.UserId(), id, admin)).Status == "PendingPayment")
+                closed = await p.CloseCheckout(id);
+            ShopGuard.Require(closed != CheckoutClose.Paid, "Đơn vừa được thanh toán qua Stripe nên không hủy được.", 409);
+            var order = await s.Cancel(h.UserId(), id, admin);
+            // A page created while the order was being cancelled. The cancel stands either way; a Stripe
+            // failure here is logged, and a payment on that page would end RefundRequired.
+            if (closed == CheckoutClose.NoSession)
+                try { await p.CloseCheckout(id); } catch (ShopException) { }
+            return Results.Ok(order);
+        });
         orders.MapPut("/{id:guid}/status", async (Guid id, StatusRequest i, ShoppingService s) => Results.Ok(await s.SetStatus(id, i.Status))).RequireAuthorization("Admin");
 
         var vouchers = api.MapGroup("/vouchers").WithTags("5 - Voucher").RequireAuthorization("Admin");
@@ -70,7 +84,7 @@ public static class ShopRoutes
         reviews.MapDelete("/{id:guid}", async (HttpContext h, Guid id, PromotionService s) => { await s.DeleteReview(h.UserId(), id, h.User.IsInRole("Admin")); return Results.NoContent(); }).RequireAuthorization();
 
         var payments = api.MapGroup("/payments").WithTags("5 - Thanh toán");
-        payments.MapPost("/orders/{id:guid}/session", async (HttpContext h, Guid id, PaymentService s) => Results.Ok(await s.Start(h.UserId(), id))).RequireAuthorization();
+        payments.MapPost("/orders/{id:guid}/session", async (HttpContext h, Guid id, PaymentService s) => Results.Ok(await s.Start(h.UserId(), id, $"{h.Request.Scheme}://{h.Request.Host}"))).RequireAuthorization();
         if (app.Environment.IsDevelopment())
             payments.MapPost("/mock/orders/{id:guid}/complete", async (HttpContext h, Guid id, MockResult i, PaymentService s) => { await s.CompleteMock(h.UserId(), id, i.Succeeded); return Results.Ok(new { orderId = id, succeeded = i.Succeeded }); }).RequireAuthorization();
         payments.MapPost("/stripe/webhook", async (HttpContext h, PaymentService s) =>
@@ -80,7 +94,28 @@ public static class ShopRoutes
             var signature = h.Request.Headers["Stripe-Signature"].ToString();
             return Results.Ok(new { processed = await s.HandleStripeWebhook(payload, signature) });
         });
+
+        // Where Stripe Checkout sends the customer afterwards. The order is updated by the webhook,
+        // not by these pages; the app reads the order again when the customer comes back.
+        app.MapGet("/payment/success", () => PaymentPage(
+            "Đã gửi thanh toán tới Stripe",
+            "Hãy quay lại ứng dụng Gundam Shop, màn thanh toán sẽ đọc lại đơn. Cửa hàng thường nhận xác nhận từ Stripe sau vài giây; nếu đơn vẫn Chờ thanh toán, đợi một chút rồi bấm \"Tôi đã thanh toán, tải lại trạng thái\"."))
+            .ExcludeFromDescription();
+        app.MapGet("/payment/cancel", () => PaymentPage(
+            "Chưa thanh toán",
+            "Bạn đã rời trang thanh toán Stripe mà chưa trả tiền. Hãy quay lại ứng dụng để thanh toán lại hoặc hủy đơn."))
+            .ExcludeFromDescription();
     }
+
+    private static IResult PaymentPage(string title, string message) => Results.Content(
+        $"""
+        <!doctype html>
+        <html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>{title}</title></head>
+        <body style="font-family: sans-serif; max-width: 32rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5">
+        <h1 style="font-size: 1.4rem">{title}</h1><p>{message}</p></body></html>
+        """,
+        "text/html; charset=utf-8");
 }
 
 public record MockResult(bool Succeeded);
