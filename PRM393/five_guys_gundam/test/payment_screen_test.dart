@@ -271,10 +271,23 @@ void main() {
     });
     await open(tester);
     expect(find.byKey(const Key('stripe-open')), findsOneWidget);
+    // Not a test-mode session id, so no test-card hint.
+    expect(find.byKey(const Key('stripe-test-card')), findsNothing);
     status = 'Paid';
     await tester.tap(find.byKey(const Key('stripe-reload')));
     await tester.pumpAndSettle();
     expect(find.text('Đã thanh toán'), findsOneWidget);
+  });
+
+  testWidgets('Stripe test mode tells which test card to use', (tester) async {
+    fake.on('POST', sessionPath, {
+      'orderId': orderId,
+      'provider': 'Stripe',
+      'status': 'Pending',
+      'checkoutUrl': 'https://checkout.stripe.com/c/pay/cs_test_a1B2c3',
+    });
+    await open(tester);
+    expect(find.textContaining('4242 4242 4242 4242'), findsOneWidget);
   });
 
   testWidgets('a free order paid by the session call shows success', (

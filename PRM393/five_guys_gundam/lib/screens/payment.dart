@@ -248,6 +248,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
               _MockActions(busy: busy, onResult: completeMock)
             else if (view.session!['checkoutUrl'] is String)
               _StripeActions(
+                // Stripe test-mode sessions have ids, and so URLs, with "cs_test_".
+                testMode: (view.session!['checkoutUrl'] as String).contains(
+                  'cs_test_',
+                ),
                 onOpen: () =>
                     openStripe(view.session!['checkoutUrl'] as String),
                 onReload: checkStripe,
@@ -340,7 +344,12 @@ class _MockActions extends StatelessWidget {
 }
 
 class _StripeActions extends StatelessWidget {
-  const _StripeActions({required this.onOpen, required this.onReload});
+  const _StripeActions({
+    required this.testMode,
+    required this.onOpen,
+    required this.onReload,
+  });
+  final bool testMode;
   final VoidCallback onOpen, onReload;
 
   @override
@@ -349,8 +358,17 @@ class _StripeActions extends StatelessWidget {
     children: [
       const Text(
         'Thanh toán trên trang Stripe. Đơn chỉ đổi trạng thái khi Stripe báo '
-        'kết quả về máy chủ; thanh toán xong hãy quay lại và tải lại trạng thái.',
+        'kết quả về máy chủ; trả xong hãy quay lại ứng dụng, màn hình tự đọc '
+        'lại trạng thái đơn.',
       ),
+      if (testMode) ...[
+        const SizedBox(height: 8),
+        const Text(
+          'Chế độ thử của Stripe: dùng thẻ 4242 4242 4242 4242, ngày hết hạn '
+          'bất kỳ trong tương lai, CVC bất kỳ. Không mất tiền thật.',
+          key: Key('stripe-test-card'),
+        ),
+      ],
       const SizedBox(height: 16),
       FilledButton.icon(
         key: const Key('stripe-open'),
