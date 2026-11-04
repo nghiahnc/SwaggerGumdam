@@ -1,3 +1,8 @@
+// Phụ trách: Nguyễn Hữu Tài (AgnesLorem) — CE190387
+// Scaffold: nhóm, có AI hỗ trợ (nghiahnc, 60b4e16)
+// UC: UC16–UC24 (FL-06)
+// Mục đích: màn hình quản trị danh mục và sản phẩm
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 

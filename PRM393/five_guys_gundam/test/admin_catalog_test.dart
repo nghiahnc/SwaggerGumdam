@@ -1,3 +1,7 @@
+// Tác giả: Nguyễn Hữu Tài (AgnesLorem) — CE190387, có AI hỗ trợ
+// UC: UC16, UC18–UC22, UC24 (FL-06)
+// Mục đích: widget test cho AdminCatalogScreen: danh mục và sản phẩm
+
 import 'package:five_guys_gundam/core/shop_repository.dart';
 import 'package:five_guys_gundam/screens/admin_catalog.dart';
 import 'package:flutter/material.dart';

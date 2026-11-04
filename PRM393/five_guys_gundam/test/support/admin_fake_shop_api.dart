@@ -1,3 +1,7 @@
+// Tác giả: Nguyễn Hữu Tài (AgnesLorem) — CE190387, có AI hỗ trợ
+// UC: dùng chung cho test FL-06..08
+// Mục đích: API giả trong bộ nhớ cho các widget test quản trị
+
 import 'dart:convert';
 
 import 'package:five_guys_gundam/core/api_client.dart';

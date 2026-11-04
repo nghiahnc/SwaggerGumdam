@@ -1,3 +1,8 @@
+// Phụ trách: Nguyễn Hữu Tài (AgnesLorem) — CE190387
+// Scaffold: nhóm, có AI hỗ trợ (nghiahnc, 60b4e16)
+// UC: UC25–UC28 (FL-07)
+// Mục đích: màn hình quản trị SKU và tồn kho
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 

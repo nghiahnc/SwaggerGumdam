@@ -1,3 +1,7 @@
+// Tác giả: Nguyễn Hữu Tài (AgnesLorem) — CE190387, có AI hỗ trợ
+// UC: UC25–UC28 (FL-07)
+// Mục đích: widget test cho AdminInventoryScreen: SKU và tồn kho
+
 import 'package:five_guys_gundam/core/shop_repository.dart';
 import 'package:five_guys_gundam/screens/admin_inventory.dart';
 import 'package:flutter/material.dart';

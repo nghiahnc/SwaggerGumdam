@@ -1,3 +1,7 @@
+// Tác giả: Nguyễn Hữu Tài (AgnesLorem) — CE190387, có AI hỗ trợ
+// UC: không có mã UC riêng (FL-08)
+// Mục đích: widget test cho AdminHomeScreen và tab Quản trị theo vai trò
+
 import 'package:five_guys_gundam/core/api_client.dart';
 import 'package:five_guys_gundam/core/session.dart';
 import 'package:five_guys_gundam/core/shop_repository.dart';
