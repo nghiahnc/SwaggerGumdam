@@ -101,6 +101,10 @@ class FakeShopApi {
       // ---------- Danh mục ----------
       case 'GET categories':
         return _json(_page(categories));
+      case 'GET categories/{id}':
+        final row = _find(categories, id);
+        if (row == null) return _problem('Không tìm thấy danh mục.', 404);
+        return _json(row);
       case 'POST categories' || 'PUT categories/{id}':
         final slug = (body['slug'] as String).toLowerCase();
         if (categories.any((c) => c['slug'] == slug && c['id'] != id)) {

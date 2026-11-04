@@ -44,6 +44,11 @@ class _AdminCatalogScreenState extends State<AdminCatalogScreen> {
     }
   }
 
+  Future<void> showCategory(Category category) => showDialog<void>(
+    context: context,
+    builder: (_) => CategoryDetailDialog(id: category.id),
+  );
+
   Future<void> editProduct(List<Category> categories, [Product? old]) async {
     final body = await showDialog<Json>(
       context: context,
@@ -107,10 +112,13 @@ class _AdminCatalogScreenState extends State<AdminCatalogScreen> {
                     '${category.slug} · ${category.isActive ? 'Đang bán' : 'Ngừng bán'}',
                   ),
                   trailing: PopupMenuButton<String>(
-                    onSelected: (action) => action == 'edit'
-                        ? editCategory(category)
-                        : remove('danh mục', category.id),
+                    onSelected: (action) {
+                      if (action == 'detail') showCategory(category);
+                      if (action == 'edit') editCategory(category);
+                      if (action == 'delete') remove('danh mục', category.id);
+                    },
                     itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'detail', child: Text('Chi tiết')),
                       PopupMenuItem(value: 'edit', child: Text('Sửa')),
                       PopupMenuItem(value: 'delete', child: Text('Ngừng bán')),
                     ],
@@ -217,6 +225,57 @@ class _CategoryDialogState extends State<CategoryDialog> {
           Navigator.pop(context, data);
         },
         child: const Text('Lưu'),
+      ),
+    ],
+  );
+}
+
+class CategoryDetailDialog extends StatefulWidget {
+  const CategoryDetailDialog({required this.id, super.key});
+  final String id;
+  @override
+  State<CategoryDetailDialog> createState() => _CategoryDetailDialogState();
+}
+
+class _CategoryDetailDialogState extends State<CategoryDetailDialog> {
+  late Future<Category> future;
+  @override
+  void initState() {
+    super.initState();
+    reload();
+  }
+
+  void reload() => setState(() {
+    future = context.read<ShopRepository>().category(widget.id);
+  });
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Chi tiết danh mục'),
+    content: SizedBox(
+      width: 420,
+      child: AsyncPanel<Category>(
+        future: future,
+        onRetry: reload,
+        builder: (category) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tên: ${category.name}'),
+            const SizedBox(height: 8),
+            Text('Slug: ${category.slug}'),
+            const SizedBox(height: 8),
+            Text('Mô tả: ${category.description ?? 'Chưa có'}'),
+            const SizedBox(height: 8),
+            Text('Trạng thái: ${category.isActive ? 'Đang bán' : 'Ngừng bán'}'),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Đóng'),
       ),
     ],
   );
