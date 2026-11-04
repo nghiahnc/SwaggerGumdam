@@ -296,12 +296,11 @@ class _ProductDialogState extends State<ProductDialog> {
   @override
   void initState() {
     super.initState();
-    categoryId =
-        widget.categories
-            .where((c) => c.isActive && c.id == widget.old?.categoryId)
-            .firstOrNull
-            ?.id ??
-        widget.categories.where((c) => c.isActive).firstOrNull?.id;
+    final active = widget.categories.where((c) => c.isActive);
+    final old = widget.old;
+    categoryId = old == null
+        ? active.firstOrNull?.id
+        : active.where((c) => c.id == old.categoryId).firstOrNull?.id;
   }
 
   Widget input(
