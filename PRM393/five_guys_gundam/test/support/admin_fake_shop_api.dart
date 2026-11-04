@@ -170,6 +170,10 @@ class FakeShopApi {
       case 'PUT variants/{id}':
         final row = _find(variants, id);
         if (row == null) return _problem('Không tìm thấy SKU.', 404);
+        if (body['isActive'] == true &&
+            _find(products, row['productId'] as String)?['isActive'] != true) {
+          return _problem('Sản phẩm đã ngừng bán.', 400);
+        }
         row.addAll(body);
         return _json(row);
       case 'DELETE variants/{id}':

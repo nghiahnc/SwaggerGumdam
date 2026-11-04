@@ -10,6 +10,9 @@ import '../core/models.dart';
 import '../core/shop_repository.dart';
 import '../widgets/common.dart';
 
+/// Backend lưu tồn bằng `int` 32 bit, số lớn hơn không gửi lên được.
+const maxStock = 2147483647;
+
 class AdminInventoryScreen extends StatefulWidget {
   const AdminInventoryScreen({super.key});
   @override
@@ -93,6 +96,7 @@ class _AdminInventoryScreenState extends State<AdminInventoryScreen> {
       onRetry: reload,
       builder: (data) {
         final (products, variants) = data;
+        final selected = products.where((p) => p.id == productId).firstOrNull;
         if (products.isEmpty) {
           return const Center(child: Text('Thêm sản phẩm trước khi tạo SKU.'));
         }
@@ -114,7 +118,7 @@ class _AdminInventoryScreenState extends State<AdminInventoryScreen> {
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: edit,
+              onPressed: selected?.isActive == true ? edit : null,
               icon: const Icon(Icons.add),
               label: const Text('Thêm SKU'),
             ),
@@ -209,10 +213,13 @@ class _VariantDialogState extends State<VariantDialog> {
                   'initialStock',
                   'Tồn ban đầu',
                   '0',
-                  validator: (v) =>
-                      int.tryParse(v ?? '') == null || int.parse(v!) < 0
-                      ? 'Nhập số nguyên không âm'
-                      : null,
+                  validator: (v) {
+                    final stock = int.tryParse(v ?? '');
+                    if (stock == null || stock < 0) {
+                      return 'Nhập số nguyên không âm';
+                    }
+                    return stock > maxStock ? 'Vượt giới hạn $maxStock' : null;
+                  },
                   keyboard: TextInputType.number,
                 ),
               if (widget.old != null)
@@ -275,10 +282,15 @@ class _StockDialogState extends State<StockDialog> {
                 labelText: 'Chênh lệch (+ nhập / - xuất)',
               ),
               keyboardType: const TextInputType.numberWithOptions(signed: true),
-              validator: (v) =>
-                  int.tryParse(v ?? '') == null || int.parse(v!) == 0
-                  ? 'Nhập số nguyên khác 0'
-                  : null,
+              validator: (v) {
+                final delta = int.tryParse(v ?? '');
+                if (delta == null || delta == 0) {
+                  return 'Nhập số nguyên khác 0';
+                }
+                return delta.abs() > maxStock
+                    ? 'Vượt giới hạn $maxStock'
+                    : null;
+              },
               onSaved: (v) => delta = int.parse(v!),
             ),
             const SizedBox(height: 10),
