@@ -8,8 +8,10 @@ import 'package:provider/provider.dart';
 
 import '../core/models.dart';
 import '../core/shop_repository.dart';
+import '../widgets/admin_form_dialog.dart';
 import '../widgets/common.dart';
 
+/// UC21: danh sách sản phẩm, gồm cả sản phẩm đã ngừng bán.
 class AdminCatalogScreen extends StatefulWidget {
   const AdminCatalogScreen({super.key});
   @override
@@ -30,20 +32,22 @@ class _AdminCatalogScreenState extends State<AdminCatalogScreen> {
         (await repo.categories(), await repo.adminProducts()))();
   });
 
+  /// UC22, UC23: có [old] là sửa, không có là thêm.
   Future<void> editProduct(List<Category> categories, [Product? old]) async {
-    final body = await showDialog<Json>(
+    final repo = context.read<ShopRepository>();
+    final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => ProductDialog(categories: categories, old: old),
+      barrierDismissible: false,
+      builder: (_) => ProductDialog(
+        categories: categories,
+        old: old,
+        onSave: (body) => repo.saveProduct(body, id: old?.id),
+      ),
     );
-    if (body == null || !mounted) return;
-    try {
-      await context.read<ShopRepository>().saveProduct(body, id: old?.id);
-      if (mounted) reload();
-    } catch (error) {
-      if (mounted) showError(context, error);
-    }
+    if (saved == true && mounted) reload();
   }
 
+  /// UC24: backend chỉ xóa mềm, sản phẩm vẫn còn trong danh sách.
   Future<void> remove(Product product) async {
     if (!await confirm(context, 'Ngừng bán sản phẩm này?') || !mounted) return;
     try {
@@ -109,21 +113,28 @@ class _AdminCatalogScreenState extends State<AdminCatalogScreen> {
   );
 }
 
+/// UC22, UC23: form thêm và sửa sản phẩm.
 class ProductDialog extends StatefulWidget {
-  const ProductDialog({required this.categories, this.old, super.key});
+  const ProductDialog({
+    required this.categories,
+    required this.onSave,
+    this.old,
+    super.key,
+  });
   final List<Category> categories;
   final Product? old;
+  final Future<void> Function(Json body) onSave;
   @override
   State<ProductDialog> createState() => _ProductDialogState();
 }
 
 class _ProductDialogState extends State<ProductDialog> {
-  final key = GlobalKey<FormState>();
   final data = <String, dynamic>{};
   String? categoryId;
   @override
   void initState() {
     super.initState();
+    // Danh mục cũ đã ngừng thì để trống, buộc chọn lại thay vì tự đổi.
     final active = widget.categories.where((c) => c.isActive);
     final old = widget.old;
     categoryId = old == null
@@ -147,63 +158,31 @@ class _ProductDialogState extends State<ProductDialog> {
   );
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.old == null ? 'Thêm sản phẩm' : 'Sửa sản phẩm'),
-    content: SizedBox(
-      width: 460,
-      child: SingleChildScrollView(
-        child: Form(
-          key: key,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: categoryId,
-                decoration: const InputDecoration(labelText: 'Danh mục'),
-                items: widget.categories
-                    .where((c) => c.isActive)
-                    .map(
-                      (c) => DropdownMenuItem(value: c.id, child: Text(c.name)),
-                    )
-                    .toList(),
-                onChanged: (v) => categoryId = v,
-                validator: (v) => v == null ? 'Chọn danh mục' : null,
-              ),
-              const SizedBox(height: 10),
-              input('name', 'Tên', widget.old?.name),
-              input('slug', 'Slug', widget.old?.slug),
-              input('grade', 'Grade (HG/MG/...)', widget.old?.grade),
-              input('scale', 'Tỉ lệ (1/144/...)', widget.old?.scale),
-              input(
-                'description',
-                'Mô tả',
-                widget.old?.description,
-                required: false,
-              ),
-              input(
-                'imageUrl',
-                'URL ảnh',
-                widget.old?.imageUrl,
-                required: false,
-              ),
-            ],
-          ),
+  Widget build(BuildContext context) => AdminFormDialog(
+    title: widget.old == null ? 'Thêm sản phẩm' : 'Sửa sản phẩm',
+    width: 460,
+    onSubmit: () => widget.onSave({...data, 'categoryId': categoryId}),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        DropdownButtonFormField<String>(
+          initialValue: categoryId,
+          decoration: const InputDecoration(labelText: 'Danh mục'),
+          items: widget.categories
+              .where((c) => c.isActive)
+              .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
+              .toList(),
+          onChanged: (v) => categoryId = v,
+          validator: (v) => v == null ? 'Chọn danh mục' : null,
         ),
-      ),
+        const SizedBox(height: 10),
+        input('name', 'Tên', widget.old?.name),
+        input('slug', 'Slug', widget.old?.slug),
+        input('grade', 'Grade (HG/MG/...)', widget.old?.grade),
+        input('scale', 'Tỉ lệ (1/144/...)', widget.old?.scale),
+        input('description', 'Mô tả', widget.old?.description, required: false),
+        input('imageUrl', 'URL ảnh', widget.old?.imageUrl, required: false),
+      ],
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Hủy'),
-      ),
-      FilledButton(
-        onPressed: () {
-          if (!key.currentState!.validate()) return;
-          key.currentState!.save();
-          Navigator.pop(context, {...data, 'categoryId': categoryId});
-        },
-        child: const Text('Lưu'),
-      ),
-    ],
   );
 }

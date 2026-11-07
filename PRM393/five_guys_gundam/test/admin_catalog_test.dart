@@ -143,6 +143,8 @@ void main() {
 
     expect(api.called('PUT', '/api/v1/products/p-freedom'), isTrue);
     expect(find.text('Slug sản phẩm đã tồn tại.'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('STRIKE'), findsOneWidget);
     expect(api.products.first['slug'], 'freedom');
   });
 
