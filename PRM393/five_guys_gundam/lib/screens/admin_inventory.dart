@@ -8,11 +8,13 @@ import 'package:provider/provider.dart';
 
 import '../core/models.dart';
 import '../core/shop_repository.dart';
+import '../widgets/admin_form_dialog.dart';
 import '../widgets/common.dart';
 
 /// Backend lưu tồn bằng `int` 32 bit, số lớn hơn không gửi lên được.
 const maxStock = 2147483647;
 
+/// Danh sách SKU theo sản phẩm đang chọn, kèm giá, tồn và trạng thái.
 class AdminInventoryScreen extends StatefulWidget {
   const AdminInventoryScreen({super.key});
   @override
@@ -40,42 +42,39 @@ class _AdminInventoryScreenState extends State<AdminInventoryScreen> {
     })();
   });
 
+  /// UC25, UC26: có [old] là sửa, không có là thêm.
   Future<void> edit([Variant? old]) async {
     if (productId == null) return;
-    final body = await showDialog<Json>(
+    final repo = context.read<ShopRepository>();
+    final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => VariantDialog(productId: productId!, old: old),
+      barrierDismissible: false,
+      builder: (_) => VariantDialog(
+        productId: productId!,
+        old: old,
+        onSave: (body) => repo.saveVariant(body, id: old?.id),
+      ),
     );
-    if (body == null || !mounted) return;
-    try {
-      await context.read<ShopRepository>().saveVariant(body, id: old?.id);
-      if (mounted) reload();
-    } catch (error) {
-      if (mounted) showError(context, error);
-    }
+    if (saved == true && mounted) reload();
   }
 
+  /// UC28: chỉ báo thành công sau khi API đã nhận điều chỉnh.
   Future<void> adjust(Variant variant) async {
-    final body = await showDialog<Json>(
+    final repo = context.read<ShopRepository>();
+    final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => const StockDialog(),
+      barrierDismissible: false,
+      builder: (_) => StockDialog(
+        onSave: (delta, reason) => repo.adjustStock(variant.id, delta, reason),
+      ),
     );
-    if (body == null || !mounted) return;
-    try {
-      await context.read<ShopRepository>().adjustStock(
-        variant.id,
-        body['delta'] as int,
-        body['reason'] as String,
-      );
-      if (mounted) {
-        showSuccess(context, 'Đã cập nhật tồn kho');
-        reload();
-      }
-    } catch (error) {
-      if (mounted) showError(context, error);
+    if (saved == true && mounted) {
+      showSuccess(context, 'Đã cập nhật tồn kho');
+      reload();
     }
   }
 
+  /// UC27: backend chỉ xóa mềm, SKU vẫn còn trong danh sách.
   Future<void> remove(Variant variant) async {
     if (!await confirm(context, 'Ngừng bán SKU ${variant.sku}?') || !mounted) {
       return;
@@ -160,16 +159,22 @@ class _AdminInventoryScreenState extends State<AdminInventoryScreen> {
   );
 }
 
+/// UC25, UC26: form thêm và sửa SKU. Mã SKU và tồn ban đầu chỉ nhập khi thêm.
 class VariantDialog extends StatefulWidget {
-  const VariantDialog({required this.productId, this.old, super.key});
+  const VariantDialog({
+    required this.productId,
+    required this.onSave,
+    this.old,
+    super.key,
+  });
   final String productId;
   final Variant? old;
+  final Future<void> Function(Json body) onSave;
   @override
   State<VariantDialog> createState() => _VariantDialogState();
 }
 
 class _VariantDialogState extends State<VariantDialog> {
-  final key = GlobalKey<FormState>();
   final data = <String, dynamic>{};
   late bool active = widget.old?.isActive ?? true;
   Widget field(
@@ -188,134 +193,101 @@ class _VariantDialogState extends State<VariantDialog> {
       onSaved: (v) => data[name] = v?.trim(),
     ),
   );
+
+  /// Ô nhập lưu chuỗi vào [data], đổi sang số ở đây trước khi gửi API.
+  Future<void> submit() {
+    data['priceVnd'] = int.parse(data['priceVnd'] as String);
+    if (widget.old == null) {
+      data['initialStock'] = int.parse(data['initialStock'] as String);
+      data['productId'] = widget.productId;
+    } else {
+      data['isActive'] = active;
+    }
+    return widget.onSave(data);
+  }
+
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.old == null ? 'Thêm SKU' : 'Sửa SKU'),
-    content: SizedBox(
-      width: 420,
-      child: SingleChildScrollView(
-        child: Form(
-          key: key,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (widget.old == null) field('sku', 'Mã SKU', null),
-              field('label', 'Tên phiên bản', widget.old?.label),
-              field(
-                'priceVnd',
-                'Giá VND',
-                widget.old?.priceVnd.toString(),
-                validator: positiveNumber,
-                keyboard: TextInputType.number,
-              ),
-              if (widget.old == null)
-                field(
-                  'initialStock',
-                  'Tồn ban đầu',
-                  '0',
-                  validator: (v) {
-                    final stock = int.tryParse(v ?? '');
-                    if (stock == null || stock < 0) {
-                      return 'Nhập số nguyên không âm';
-                    }
-                    return stock > maxStock ? 'Vượt giới hạn $maxStock' : null;
-                  },
-                  keyboard: TextInputType.number,
-                ),
-              if (widget.old != null)
-                SwitchListTile(
-                  title: const Text('Đang bán'),
-                  value: active,
-                  onChanged: (v) => setState(() => active = v),
-                ),
-            ],
-          ),
+  Widget build(BuildContext context) => AdminFormDialog(
+    title: widget.old == null ? 'Thêm SKU' : 'Sửa SKU',
+    onSubmit: submit,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.old == null) field('sku', 'Mã SKU', null),
+        field('label', 'Tên phiên bản', widget.old?.label),
+        field(
+          'priceVnd',
+          'Giá VND',
+          widget.old?.priceVnd.toString(),
+          validator: positiveNumber,
+          keyboard: TextInputType.number,
         ),
-      ),
+        if (widget.old == null)
+          field(
+            'initialStock',
+            'Tồn ban đầu',
+            '0',
+            validator: (v) {
+              final stock = int.tryParse(v ?? '');
+              if (stock == null || stock < 0) {
+                return 'Nhập số nguyên không âm';
+              }
+              return stock > maxStock ? 'Vượt giới hạn $maxStock' : null;
+            },
+            keyboard: TextInputType.number,
+          ),
+        if (widget.old != null)
+          SwitchListTile(
+            title: const Text('Đang bán'),
+            value: active,
+            onChanged: (v) => setState(() => active = v),
+          ),
+      ],
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Hủy'),
-      ),
-      FilledButton(
-        onPressed: () {
-          if (!key.currentState!.validate()) return;
-          key.currentState!.save();
-          data['priceVnd'] = int.parse(data['priceVnd'] as String);
-          if (widget.old == null) {
-            data['initialStock'] = int.parse(data['initialStock'] as String);
-            data['productId'] = widget.productId;
-          } else {
-            data['isActive'] = active;
-          }
-          Navigator.pop(context, data);
-        },
-        child: const Text('Lưu'),
-      ),
-    ],
   );
 }
 
+/// UC28: form điều chỉnh tồn. Số dương là nhập, số âm là xuất.
 class StockDialog extends StatefulWidget {
-  const StockDialog({super.key});
+  const StockDialog({required this.onSave, super.key});
+  final Future<void> Function(int delta, String reason) onSave;
   @override
   State<StockDialog> createState() => _StockDialogState();
 }
 
 class _StockDialogState extends State<StockDialog> {
-  final key = GlobalKey<FormState>();
   int delta = 0;
   String reason = '';
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Điều chỉnh tồn kho'),
-    content: SizedBox(
-      width: 400,
-      child: Form(
-        key: key,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              decoration: const InputDecoration(
-                labelText: 'Chênh lệch (+ nhập / - xuất)',
-              ),
-              keyboardType: const TextInputType.numberWithOptions(signed: true),
-              validator: (v) {
-                final delta = int.tryParse(v ?? '');
-                if (delta == null || delta == 0) {
-                  return 'Nhập số nguyên khác 0';
-                }
-                return delta.abs() > maxStock
-                    ? 'Vượt giới hạn $maxStock'
-                    : null;
-              },
-              onSaved: (v) => delta = int.parse(v!),
-            ),
-            const SizedBox(height: 10),
-            TextFormField(
-              decoration: const InputDecoration(labelText: 'Lý do'),
-              validator: requiredText,
-              onSaved: (v) => reason = v!.trim(),
-            ),
-          ],
+  Widget build(BuildContext context) => AdminFormDialog(
+    title: 'Điều chỉnh tồn kho',
+    submitLabel: 'Cập nhật',
+    width: 400,
+    onSubmit: () => widget.onSave(delta, reason),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextFormField(
+          decoration: const InputDecoration(
+            labelText: 'Chênh lệch (+ nhập / - xuất)',
+          ),
+          keyboardType: const TextInputType.numberWithOptions(signed: true),
+          validator: (v) {
+            final delta = int.tryParse(v ?? '');
+            if (delta == null || delta == 0) {
+              return 'Nhập số nguyên khác 0';
+            }
+            return delta.abs() > maxStock ? 'Vượt giới hạn $maxStock' : null;
+          },
+          onSaved: (v) => delta = int.parse(v!),
         ),
-      ),
+        const SizedBox(height: 10),
+        TextFormField(
+          decoration: const InputDecoration(labelText: 'Lý do'),
+          validator: requiredText,
+          onSaved: (v) => reason = v!.trim(),
+        ),
+      ],
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Hủy'),
-      ),
-      FilledButton(
-        onPressed: () {
-          if (!key.currentState!.validate()) return;
-          key.currentState!.save();
-          Navigator.pop(context, {'delta': delta, 'reason': reason});
-        },
-        child: const Text('Cập nhật'),
-      ),
-    ],
   );
 }

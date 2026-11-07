@@ -105,6 +105,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('SKU đã tồn tại.'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsOneWidget);
   });
 
   testWidgets(
@@ -157,6 +158,7 @@ void main() {
     await submitStock(tester, '-100', 'Kiểm kê');
 
     expect(find.text('Tồn kho không hợp lệ.'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('450.000 ₫ · Tồn 5 · Đang bán'), findsOneWidget);
   });
 
