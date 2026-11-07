@@ -1,9 +1,16 @@
+// Phụ trách: Nguyễn Hữu Tài (AgnesLorem) — CE190387
+// Scaffold: nhóm, có AI hỗ trợ (nghiahnc, 60b4e16)
+// UC: không có mã UC riêng (FL-08)
+// Mục đích: trang Quản trị, lối vào các màn chỉ dành cho Admin
+
 import 'package:flutter/material.dart';
 
 import 'admin_catalog.dart';
+import 'admin_categories.dart';
 import 'admin_inventory.dart';
 import 'vouchers.dart';
 
+/// Tab Quản trị. `ShopShell` chỉ hiện tab này khi tài khoản là Admin.
 class AdminHomeScreen extends StatelessWidget {
   const AdminHomeScreen({super.key});
   @override
@@ -15,8 +22,19 @@ class AdminHomeScreen extends StatelessWidget {
         Card(
           child: ListTile(
             leading: const Icon(Icons.category_outlined),
-            title: const Text('Danh mục và sản phẩm'),
-            subtitle: const Text('Thêm, sửa và ngừng bán'),
+            title: const Text('Danh mục'),
+            subtitle: const Text('Xem, thêm, sửa và ngừng bán danh mục'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminCategoriesScreen()),
+            ),
+          ),
+        ),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.view_in_ar_outlined),
+            title: const Text('Sản phẩm'),
+            subtitle: const Text('Thêm, sửa và ngừng bán sản phẩm'),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AdminCatalogScreen()),

@@ -25,8 +25,8 @@ Future<void> pumpWithRepo(WidgetTester tester, Widget home) async {
 
 void main() {
   for (final (entry, title) in [
-    ('Danh mục và sản phẩm', 'Catalog quản trị'),
-    ('Thêm, sửa và ngừng bán', 'Catalog quản trị'),
+    ('Xem, thêm, sửa và ngừng bán danh mục', 'Danh mục'),
+    ('Thêm, sửa và ngừng bán sản phẩm', 'Quản lý sản phẩm'),
     ('Quản lý phiên bản, giá, điều chỉnh tồn', 'SKU và tồn kho'),
     ('Thiết lập mã giảm giá và thời hạn', 'Voucher'),
   ]) {

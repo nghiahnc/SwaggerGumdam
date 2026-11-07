@@ -1,6 +1,6 @@
 // Tác giả: Nguyễn Hữu Tài (AgnesLorem) — CE190387, có AI hỗ trợ
-// UC: UC16–UC24 (FL-06)
-// Mục đích: widget test cho AdminCatalogScreen: danh mục và sản phẩm
+// UC: UC21–UC24 (FL-06)
+// Mục đích: widget test cho AdminCatalogScreen: sản phẩm
 
 import 'package:five_guys_gundam/core/shop_repository.dart';
 import 'package:five_guys_gundam/screens/admin_catalog.dart';
@@ -23,8 +23,7 @@ Future<FakeShopApi> pumpCatalog(WidgetTester tester, [FakeShopApi? api]) async {
 }
 
 Finder field(String label) => find.widgetWithText(TextFormField, label);
-Finder addButton(int index) =>
-    find.widgetWithText(FilledButton, 'Thêm').at(index);
+Finder get addButton => find.widgetWithText(FilledButton, 'Thêm');
 
 Future<void> openMenu(
   WidgetTester tester,
@@ -43,72 +42,10 @@ Future<void> openMenu(
 }
 
 void main() {
-  testWidgets('C1 hiển thị danh mục, sản phẩm và trạng thái', (tester) async {
+  testWidgets('C22 hiển thị sản phẩm và trạng thái', (tester) async {
     await pumpCatalog(tester);
-    expect(find.text('High Grade'), findsOneWidget);
     expect(find.text('Freedom Gundam'), findsOneWidget);
-    expect(find.text('high-grade · Đang bán'), findsOneWidget);
-  });
-
-  testWidgets('C2 thêm danh mục gửi POST và tải lại danh sách', (tester) async {
-    final api = await pumpCatalog(tester);
-    await tester.tap(addButton(0));
-    await tester.pumpAndSettle();
-    await tester.enterText(field('Tên'), '  Master Grade ');
-    await tester.enterText(field('Slug'), 'master-grade');
-    await tester.tap(find.text('Lưu'));
-    await tester.pumpAndSettle();
-
-    expect(api.lastBody('POST', '/api/v1/categories')['name'], 'Master Grade');
-    expect(find.text('Master Grade'), findsOneWidget);
-  });
-
-  testWidgets('C3 form danh mục rỗng bị chặn, không gọi API', (tester) async {
-    final api = await pumpCatalog(tester);
-    await tester.tap(addButton(0));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Lưu'));
-    await tester.pump();
-
-    expect(find.text('Không được để trống'), findsNWidgets(2));
-    expect(api.called('POST', '/api/v1/categories'), isFalse);
-  });
-
-  testWidgets('C4 slug trùng hiện lỗi 409 từ API', (tester) async {
-    await pumpCatalog(tester);
-    await tester.tap(addButton(0));
-    await tester.pumpAndSettle();
-    await tester.enterText(field('Tên'), 'Trùng');
-    await tester.enterText(field('Slug'), 'HIGH-GRADE');
-    await tester.tap(find.text('Lưu'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Slug danh mục đã tồn tại.'), findsOneWidget);
-  });
-
-  testWidgets('C5 sửa danh mục điền sẵn dữ liệu cũ và gửi PUT', (tester) async {
-    final api = await pumpCatalog(tester);
-    await openMenu(tester, 'High Grade', 'Sửa');
-    expect(find.text('Sửa danh mục'), findsOneWidget);
-    expect(find.text('high-grade'), findsWidgets);
-
-    await tester.enterText(field('Tên'), 'HG Universal');
-    await tester.tap(find.text('Lưu'));
-    await tester.pumpAndSettle();
-
-    expect(api.called('PUT', '/api/v1/categories/cat-hg'), isTrue);
-    expect(find.text('HG Universal'), findsOneWidget);
-  });
-
-  testWidgets('C6 không ngừng được danh mục còn sản phẩm đang bán', (
-    tester,
-  ) async {
-    await pumpCatalog(tester);
-    await openMenu(tester, 'High Grade', 'Ngừng bán');
-    await tester.tap(find.text('Đồng ý'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Còn sản phẩm đang bán trong danh mục.'), findsOneWidget);
+    expect(find.textContaining('Đang bán'), findsOneWidget);
   });
 
   testWidgets('C7 bấm "Không" ở hộp xác nhận thì không xóa', (tester) async {
@@ -122,7 +59,7 @@ void main() {
 
   testWidgets('C8 thêm sản phẩm gửi kèm categoryId mặc định', (tester) async {
     final api = await pumpCatalog(tester);
-    await tester.tap(addButton(1));
+    await tester.tap(addButton);
     await tester.pumpAndSettle();
     await tester.enterText(field('Tên'), 'Strike Gundam');
     await tester.enterText(field('Slug'), 'strike');
@@ -162,52 +99,11 @@ void main() {
 
     final button = tester.widget<ButtonStyleButton>(
       find.ancestor(
-        of: find.text('Thêm').at(1),
+        of: find.text('Thêm'),
         matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
       ),
     );
     expect(button.onPressed, isNull);
-  });
-
-  testWidgets('C11 xem chi tiết danh mục gọi GET theo id', (tester) async {
-    final api = await pumpCatalog(tester);
-    await openMenu(tester, 'High Grade', 'Chi tiết');
-
-    expect(api.called('GET', '/api/v1/categories/cat-hg'), isTrue);
-    expect(find.text('Chi tiết danh mục'), findsOneWidget);
-    expect(find.text('Tên: High Grade'), findsOneWidget);
-    expect(find.text('Slug: high-grade'), findsOneWidget);
-    expect(find.text('Mô tả: Chưa có'), findsOneWidget);
-    expect(find.text('Trạng thái: Đang bán'), findsOneWidget);
-
-    await tester.tap(find.text('Đóng'));
-    await tester.pumpAndSettle();
-    expect(find.text('Chi tiết danh mục'), findsNothing);
-  });
-
-  testWidgets('C12 danh mục không còn tồn tại hiện lỗi 404 và nút thử lại', (
-    tester,
-  ) async {
-    final api = await pumpCatalog(tester);
-    api.categories.clear();
-    await openMenu(tester, 'High Grade', 'Chi tiết');
-
-    expect(find.text('Không tìm thấy danh mục.'), findsOneWidget);
-    expect(find.text('Thử lại'), findsOneWidget);
-  });
-
-  testWidgets('C15 ngừng bán danh mục không còn sản phẩm đang bán', (
-    tester,
-  ) async {
-    final api = FakeShopApi().seed();
-    api.products.first['isActive'] = false;
-    await pumpCatalog(tester, api);
-    await openMenu(tester, 'High Grade', 'Ngừng bán');
-    await tester.tap(find.text('Đồng ý'));
-    await tester.pumpAndSettle();
-
-    expect(api.called('DELETE', '/api/v1/categories/cat-hg'), isTrue);
-    expect(find.text('high-grade · Ngừng bán'), findsOneWidget);
   });
 
   testWidgets('C13 sửa sản phẩm gọi PUT, giữ danh mục và tải lại danh sách', (

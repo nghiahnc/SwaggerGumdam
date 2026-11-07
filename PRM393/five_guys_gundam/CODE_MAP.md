@@ -26,7 +26,8 @@ Tài liệu này nối **màn hình → state/logic → model → endpoint → k
 | Huỳnh Nguyễn Chí Nghĩa | `AddressesScreen`, `screens/addresses.dart` | Xem/thêm/sửa/xóa địa chỉ | `GET/POST /api/v1/addresses`, `PUT/DELETE /api/v1/addresses/{id}` |
 | Ngô Quốc Hưng | `CatalogScreen`, `screens/catalog.dart` | OData tìm/lọc/skip/top | `GET /odata/Products` |
 | Ngô Quốc Hưng | `ProductScreen`, `screens/product.dart` | Chi tiết, SKU, chọn số lượng, thêm giỏ | `GET /api/v1/products/{id}`, `GET /api/v1/products/{id}/variants`, `POST /api/v1/cart/items` |
-| Nguyễn Hữu Tài | `AdminCatalogScreen`, `screens/admin_catalog.dart` | CRUD danh mục và sản phẩm | `GET/POST/PUT/DELETE /api/v1/categories`, `/api/v1/products` |
+| Nguyễn Hữu Tài | `AdminCategoriesScreen`, `CategoryDetailScreen`, `screens/admin_categories.dart` | Danh sách, chi tiết, thêm, sửa, ngừng bán danh mục | `GET/POST/PUT/DELETE /api/v1/categories` |
+| Nguyễn Hữu Tài | `AdminCatalogScreen`, `screens/admin_catalog.dart` | CRUD sản phẩm | `GET/POST/PUT/DELETE /api/v1/products` |
 | Nguyễn Hữu Tài | `AdminInventoryScreen`, `screens/admin_inventory.dart` | CRUD SKU, đổi giá/trạng thái, điều chỉnh tồn | `GET /api/v1/products/{id}/variants`, `POST/PUT/DELETE /api/v1/variants`, `POST /api/v1/variants/{id}/stock-adjustments` |
 | Trần Gia Đạt | `CartScreen`, `screens/cart.dart` | Xem/sửa số lượng/xóa giỏ | `GET/PUT/DELETE /api/v1/cart/items` |
 | Trần Gia Đạt | `CheckoutScreen`, `screens/checkout.dart` | Chọn địa chỉ, voucher, tạo đơn | `GET /api/v1/addresses`, `POST /api/v1/orders` |

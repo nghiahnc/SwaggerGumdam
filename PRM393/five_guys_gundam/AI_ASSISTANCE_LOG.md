@@ -6,6 +6,7 @@
 | --- | --- | --- | --- | --- | --- |
 | 2026-10-05 | Tạo scaffold Flutter dựa trên API PRN232 và đề PRM393 | Codex | Gợi ý kiến trúc, viết mã màn hình/repository và tài liệu ban đầu | AI đã chạy analyze/test, build APK và thử luồng catalog → giỏ → đơn → mock Paid → Delivered trên Android Emulator; **chưa có xác nhận cá nhân**. Từng thành viên cần review, chạy thử, sửa, bổ sung test và commit thật. | Scaffold ban đầu, commit AI `12649a9`; commit cá nhân chưa có |
 | 2026-10-05 | Bổ sung demo Edge | Codex | Thêm nền tảng web, chọn URL API theo nền tảng, sửa lỗi mạng đa nền tảng và tài liệu chạy | AI đã chạy analyze/test, build Web và kiểm tra CORS/API bằng HTTP. Chưa có xác nhận cá nhân. | `web/`, `lib/main.dart`, `lib/core/api_client.dart`, `README.md` |
+| 2026-11-07 | UC16–UC20: viết lại màn quản trị danh mục thành file riêng; form không còn đóng khi lưu lỗi | Claude Code | Viết `admin_categories.dart`, `admin_form_dialog.dart`, `admin_categories_test.dart` và sửa các dialog sản phẩm, SKU, tồn kho theo yêu cầu của Nguyễn Hữu Tài | AI đã chạy analyze, widget test và thử luồng thêm, trùng slug, chi tiết, ngừng bán với API và SQL Server thật. Chưa có xác nhận cá nhân: Tài cần tự đọc, chạy thử và ghi lại đã kiểm tra gì. | `lib/screens/admin_categories.dart`, `lib/widgets/admin_form_dialog.dart`, `test/admin_categories_test.dart` |
 
 ## Mẫu cho các lần tiếp theo
 
