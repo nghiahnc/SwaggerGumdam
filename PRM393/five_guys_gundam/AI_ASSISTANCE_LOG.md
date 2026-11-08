@@ -24,3 +24,9 @@ Nội dung lịch sử ở trên được khôi phục nguyên từ `aea1bf1`; p
 | Ngày | Tác vụ | Công cụ | AI hỗ trợ | Người học đã kiểm tra/thay đổi | Màn hình/commit |
 | --- | --- | --- | --- | --- | --- |
 | 2026-11-08 | Sửa các thiếu sót FL-13..15 trên nhánh gộp theo bản đánh giá | Codex | Bổ sung màn chi tiết voucher UC39 và đánh giá UC44 đọc API theo ID; sửa kiểm tra dữ liệu webhook Stripe trước khi tra cứu thanh toán; thêm 10 Flutter test và 13 kiểm tra Stripe hồi quy; khôi phục log. Kết quả kiểm tra thực tế ghi ở `qa/VERIFICATION.md`. | AI thực hiện; **chưa có xác nhận cá nhân** của sinh viên. Cần tự đọc và chạy thử trước khi ký nhận. | `nghiahnc/merge-prm393-features`, nền `dbfa118`; commit Voucher `bfecf85`, Đánh giá `f45f7bb`, API Stripe `4d02a4b`, kiểm thử `80e75d7`; khôi phục log và cập nhật tài liệu trong commit chứa dòng này |
+
+## Bổ sung chi tiết mục giỏ hàng · 08/11/2026
+
+| Ngày | Tác vụ | Công cụ | AI hỗ trợ | Người học đã kiểm tra/thay đổi | Màn hình/commit |
+| --- | --- | --- | --- | --- | --- |
+| 2026-11-08 | Bổ sung màn chi tiết mục giỏ hàng theo yêu cầu backlog | Codex | Thêm `CartItemDetailScreen` đọc API theo ID, nối điều hướng từ giỏ và tải lại khi quay về; thêm 8 widget test; kiểm tra API thật 12/12 trên database riêng; kết quả kiểm tra ghi trong `qa/VERIFICATION.md`. | AI thực hiện; **chưa có xác nhận cá nhân** của sinh viên. | Commit mã nguồn `7daff9e`; `lib/screens/cart_item_detail.dart`, `cart.dart`, `lib/core/shop_repository.dart`, `test/cart_item_detail_test.dart` |
