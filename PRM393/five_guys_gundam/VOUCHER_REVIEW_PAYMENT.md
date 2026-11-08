@@ -4,8 +4,8 @@ Phần việc của **Trần Hiếu Nghĩa** theo bảng phân công Flutter PRM
 
 | Task | Màn hình | Ai dùng, vào từ đâu | API |
 | --- | --- | --- | --- |
-| FL-13 | `VouchersScreen` · `lib/screens/vouchers.dart` | Admin · tab **Quản trị** → **Voucher** | `GET /api/v1/vouchers`, `GET /api/v1/vouchers/{id}`, `POST /api/v1/vouchers`, `PUT/DELETE /api/v1/vouchers/{id}` (chỉ Admin) |
-| FL-14 | `ReviewsScreen` · `lib/screens/reviews.dart` | Mọi người · chi tiết sản phẩm → **Đánh giá sau mua** | `GET /api/v1/products/{id}/reviews`; `POST/PUT/DELETE /api/v1/reviews` (cần đăng nhập) |
+| FL-13 | `VouchersScreen`, `VoucherDetailScreen` · `lib/screens/vouchers.dart` | Admin · tab **Quản trị** → **Voucher** → bấm một voucher để xem chi tiết | `GET /api/v1/vouchers`, `GET /api/v1/vouchers/{id}`, `POST /api/v1/vouchers`, `PUT/DELETE /api/v1/vouchers/{id}` (chỉ Admin) |
+| FL-14 | `ReviewsScreen`, `ReviewDetailScreen` · `lib/screens/reviews.dart` | Mọi người · chi tiết sản phẩm → **Đánh giá sau mua** → bấm một đánh giá để xem chi tiết | `GET /api/v1/products/{id}/reviews`, `GET /api/v1/reviews/{id}`; `POST/PUT/DELETE /api/v1/reviews` (cần đăng nhập) |
 | FL-15 | `PaymentScreen` · `lib/screens/payment.dart` | Khách · chi tiết đơn chờ thanh toán → **Thanh toán** (nút chỉ hiện với người đặt đơn) | `GET /api/v1/orders/{id}`; `POST /api/v1/payments/orders/{id}/session`; `POST /api/v1/payments/mock/orders/{id}/complete` (chỉ Development) |
 
 ## 1. Cách làm chung
@@ -42,7 +42,7 @@ Phần việc của **Trần Hiếu Nghĩa** theo bảng phân công Flutter PRM
   | Số tiền giảm | Số nguyên 1 – 1.000.000.000 ₫ |
   | Đơn tối thiểu | Số nguyên 0 – 1.000.000.000 ₫ |
   | Số lượt tối đa | 1 – 1.000.000; khi sửa không nhỏ hơn số lượt đã dùng |
-  | Mã khi sửa | Không đổi được khi voucher còn lượt đã dùng (`VoucherPolicy.canChangeCode`, tức `usedCount > 0`: có đơn chờ thanh toán hoặc đã thanh toán; đơn bị hủy, hết hạn hay thất bại đã trả lượt nên không tính). Đơn chỉ lưu mã định danh của voucher, nên đổi mã sẽ làm mã khách đang biết thành "Không tìm thấy voucher" và nhả mã cũ cho voucher khác. Khi bấm Sửa, app đọc lại voucher (`GET /api/v1/vouchers/{id}`) để dùng số lượt mới nhất; nếu đọc lỗi thì dùng bản trong danh sách, còn nếu voucher vừa bị ngừng thì không mở form mà báo "Voucher … đã ngừng sử dụng" và tải lại danh sách. API không có quy tắc khóa mã, nên gọi thẳng API (Swagger) vẫn đổi được mã |
+  | Mã khi sửa | Không đổi được khi voucher còn lượt đã dùng (`VoucherPolicy.canChangeCode`, tức `usedCount > 0`: có đơn chờ thanh toán hoặc đã thanh toán; đơn bị hủy, hết hạn hay thất bại đã trả lượt nên không tính). Đơn chỉ lưu mã định danh của voucher, nên đổi mã sẽ làm mã khách đang biết thành "Không tìm thấy voucher" và nhả mã cũ cho voucher khác. Khi bấm Sửa, app đọc lại voucher (`GET /api/v1/vouchers/{id}`) để dùng số lượt mới nhất; nếu đọc lỗi thì báo lý do và không mở form, người dùng có thể bấm Sửa để thử lại. Nếu voucher vừa bị ngừng thì không mở form mà báo "Voucher … đã ngừng sử dụng" và tải lại danh sách. API không có quy tắc khóa mã, nên gọi thẳng API (Swagger) vẫn đổi được mã |
   | Thời gian | Bắt đầu trước kết thúc; kết thúc phải sau hiện tại |
 
   Khi số tiền giảm từ đơn tối thiểu trở lên (`VoucherPolicy.makesOrdersFree`), form hiện cảnh báo "Lưu ý: đơn từ X ₫ đến Y ₫ sẽ được giảm còn 0 ₫." vì checkout giới hạn mức giảm bằng tiền hàng. Cảnh báo không chặn việc lưu, để vẫn tạo được voucher miễn phí có chủ ý.
@@ -53,9 +53,11 @@ Phần việc của **Trần Hiếu Nghĩa** theo bảng phân công Flutter PRM
 
 - **Chọn ngày giờ:** toàn bộ bộ chọn là tiếng Việt (tên tháng, thứ, nút chuyển tháng), giờ luôn ở dạng 24 giờ như trên form. Gõ ngày bằng tay theo dạng `dd/mm/yyyy` (ngày trước). Bản dịch lấy từ `flutter_localizations` và chỉ áp dụng cho hai bộ chọn này.
 - **Ngừng sử dụng** là xóa mềm (`IsActive = false`), có hộp xác nhận. Voucher đã ngừng không còn menu, vì API không có cách bật lại.
+- **Chi tiết (UC39):** bấm vào voucher để mở `VoucherDetailScreen`, kể cả voucher đã ngừng. Màn này gọi riêng `GET /api/v1/vouchers/{id}`, hiển thị mã, mức giảm, đơn tối thiểu, lượt dùng, thời hạn và trạng thái mới nhất. Nút **Tải lại** đọc lại API; lỗi có nút **Thử lại**. Khách không phải Admin không gửi request và không xem được nội dung.
 
 ## 3. FL-14 · Đánh giá
 
+- **Chi tiết (UC44):** bấm một đánh giá để mở `ReviewDetailScreen`. Màn này gọi `GET /api/v1/reviews/{id}`, hiển thị số sao, nhận xét và thời điểm mới nhất; hỗ trợ khách chưa đăng nhập. Nếu đánh giá đã bị xóa thì hiện lỗi API cùng nút **Thử lại**, không hiện lại bản cũ. Khi quay về, danh sách được đọc lại.
 - **Ai làm được gì:**
   - Ai cũng xem được.
   - Muốn viết phải đăng nhập. Khách chưa đăng nhập thấy nút "Đăng nhập để viết đánh giá".
@@ -94,14 +96,17 @@ Phần việc của **Trần Hiếu Nghĩa** theo bảng phân công Flutter PRM
   - khi phiên là phiên thử của Stripe (mã có `cs_test_`), màn hình ghi thẻ thử `4242 4242 4242 4242` để demo;
   - backend cần `Payments:Provider = Stripe`, test key và webhook secret (qua `stripe listen`); trong Development, trang quay về mặc định là `/payment/success` và `/payment/cancel` của chính API (môi trường khác phải đặt `SuccessUrl`/`CancelUrl`). Cách chạy: `docs/DEVELOPER_GUIDE.md` mục 5, "Chạy Stripe ở chế độ thử".
 
+- **Dữ liệu webhook:** sau khi kiểm tra chữ ký, API kiểm tra cấu trúc JSON, mã sự kiện, loại sự kiện và mã phiên trước khi tra cứu thanh toán. Payload sai hoặc mã phiên thiếu/rỗng trả 400; mã phiên `null` không được dùng để tìm đơn chưa mở trang Stripe.
+
 ## 5. Kiểm thử
 
 | File | Loại | Số test | Ứng với "Kiểm thử tối thiểu" |
 | --- | --- | --- | --- |
 | `test/voucher_policy_test.dart` | Unit | 14 | Ngày sai, voucher hết hạn (ranh giới bắt đầu/kết thúc), mã, số tiền, lượt; đọc ngày UTC; voucher làm đơn thành 0 ₫; khóa mã sau khi đã dùng |
 | `test/review_payment_policy_test.dart` | Unit | 9 | Form rỗng, sửa/xóa của người khác; nhãn kết quả thanh toán; nhãn trạng thái đơn giống màn đơn hàng; tiền đến khi đơn đã đóng |
-| `test/vouchers_screen_test.dart` | Widget | 24 | Quyền Admin (không gửi request; 403), voucher hết hạn và ngày hiển thị theo giờ máy, ngày sai, mã trùng (409), thêm (gửi đủ mức giảm và đơn tối thiểu), sửa (PUT giữ nguyên thời điểm), lượt tối đa không dưới số đã dùng, voucher có mã cũ, không đóng form khi đang lưu, ngừng sử dụng, danh sách rỗng, dòng lỗi được xuống dòng, bộ chọn ngày giờ tiếng Việt và 24 giờ, ngày gõ tay đọc theo ngày trước, cảnh báo đơn 0 ₫, khóa mã đã dùng (kể cả khi danh sách đã cũ), ghi chú lượt giữ bởi đơn chờ, đọc mã thứ 101 ở trang 2, mã mới xuất hiện giữa hai trang, trang thiếu `totalCount`, voucher vừa bị ngừng không mở form sửa |
-| `test/reviews_screen_test.dart` | Widget | 17 | Đánh giá trước giao (403), sửa/xóa của người khác, form rỗng (cả trường hợp chỉ thiếu số sao), viết, sửa, xóa (danh sách cập nhật), 404 khi sửa, 409 khi viết, xóa bị từ chối, danh sách rỗng, 5 ngôi sao trên một dòng ở màn 320px, Admin không có nút viết (nhưng vẫn sửa được đánh giá đã có của mình), đánh giá của mình nằm sau 100 đánh giá mới nhất |
+| `test/vouchers_screen_test.dart` | Widget | 25 | Quyền Admin (không gửi request; 403), voucher hết hạn và ngày hiển thị theo giờ máy, ngày sai, mã trùng (409), thêm (gửi đủ mức giảm và đơn tối thiểu), sửa (PUT giữ nguyên thời điểm), lượt tối đa không dưới số đã dùng, voucher có mã cũ, không đóng form khi đang lưu, ngừng sử dụng, danh sách rỗng, dòng lỗi được xuống dòng, bộ chọn ngày giờ tiếng Việt và 24 giờ, ngày gõ tay đọc theo ngày trước, cảnh báo đơn 0 ₫, khóa mã đã dùng (kể cả khi danh sách đã cũ), ghi chú lượt giữ bởi đơn chờ, đọc mã thứ 101 ở trang 2, mã mới xuất hiện giữa hai trang, trang thiếu `totalCount`, voucher vừa bị ngừng không mở form sửa; đọc lại lỗi thì không mở form, thử lại lấy số lượt mới nhất |
+| `test/voucher_detail_screen_test.dart` | Widget | 6 | Chi tiết UC39 đọc mới theo ID; voucher ngừng vẫn xem được; lỗi/thử lại; tải lại lượt dùng và trạng thái; quyền khách; phiên đăng nhập hết hạn; danh sách tải lại khi quay về |
+| `test/reviews_screen_test.dart` | Widget | 20 | Đánh giá trước giao (403), sửa/xóa của người khác, form rỗng (cả trường hợp chỉ thiếu số sao), viết, sửa, xóa (danh sách cập nhật), 404 khi sửa, 409 khi viết, xóa bị từ chối, danh sách rỗng, 5 ngôi sao trên một dòng ở màn 320px, Admin không có nút viết (nhưng vẫn sửa được đánh giá đã có của mình), đánh giá của mình nằm sau 100 đánh giá mới nhất; chi tiết UC44 đọc API mới nhất, 404/thử lại, tải lại chi tiết và danh sách |
 | `test/payment_screen_test.dart` | Widget | 23 | Hai kết quả mock, tải lại trạng thái đơn sau thanh toán, đơn không còn chờ, mock bị từ chối, đơn 0 ₫, phiên bị từ chối (409 đơn đã đổi / 409 đơn vẫn chờ / 404 / 5xx), mất kết nối rồi Thử lại, mở đúng URL Stripe, Stripe chưa báo kết quả, khóa nút và Back khi đang gửi, mã đơn ngắn hơn 8 ký tự, tiền đến khi đơn đã hủy/hết hạn/thất bại (3 test), tự đọc lại đơn khi quay về từ Stripe (lặng lẽ, thôi đọc khi đơn hết chờ), lần đọc cũ không đè kết quả tải lại mới hơn, phiên bị từ chối tạm thời không làm dừng việc đọc lại, gợi ý thẻ thử khi Stripe ở chế độ thử |
 
 Widget test dùng `test/support/fake_shop_api.dart`: API giả qua `MockClient`, mỗi test tự khai báo câu trả lời. Các test quyền Admin, ngày sai, form rỗng và đơn không còn chờ kiểm tra cả việc **không** gửi request. Các câu trả lời giả đã được đối chiếu với API thật ngày 10/10/2026:
@@ -125,6 +130,8 @@ Trên bản gộp `nghiahnc/merge-prm393-features` (có AI hỗ trợ, sinh viê
 - Ngày 19/10/2026, sau khi sửa các lỗi tìm được trên bản gộp (mã đơn và nhãn trạng thái giống màn đơn hàng, ô voucher ở checkout dùng chung quy tắc mã, bộ chọn ngày giờ tiếng Việt): `flutter analyze` không có lỗi; `flutter test` qua **141/141**, trong đó 66 test của phần này.
 - Ngày 19/10/2026, sau khi soát nghiệp vụ với API thật (tiền đến khi đơn đã đóng, danh sách hơn 100 mục, voucher làm đơn thành 0 ₫, đổi mã voucher đã dùng, Admin viết đánh giá, quay lại từ Stripe): `flutter analyze` không có lỗi; `flutter test` qua **161/161**, trong đó 86 test của phần này. Gài 18 lỗi cố ý vào các phần mới, cả 18 lần test đều báo lỗi.
 - Ngày 27/10/2026, sau khi hoàn thiện Stripe chế độ thử (sửa API thanh toán, gợi ý thẻ thử trong app): `flutter test` qua **162/162**, trong đó 87 test của phần này; `tests/stripe_e2e.py` chạy với máy chủ đóng vai Stripe (`tests/stripe_stub.py`) qua 44/44 kiểm tra (gồm hủy đơn khi trang Stripe đang mở hoặc đang được tạo, bấm mở phiên hai lần cùng lúc, Stripe lỗi 500, trả tiền sát hạn, đơn quá hạn hoặc sắp hết hạn, webhook hết hạn/thất bại/sai chữ ký). Chưa chạy với tài khoản Stripe thật vì chưa có test key.
+
+- Ngày 08/11/2026, sau khi bổ sung chi tiết UC39/UC44, chặn mở form sửa voucher bằng dữ liệu cũ khi GET lỗi và kiểm tra dữ liệu webhook trước khi tra cứu thanh toán: `flutter analyze --no-pub` không có issue; toàn bộ Flutter test chạy từng file qua **172/172** (19 file, trong đó 97 test của FL-13..15). API build **0 lỗi, 0 cảnh báo**; Stripe giả lập qua **57/57**, gồm 13 kiểm tra mới. [Bằng chứng chi tiết](qa/VERIFICATION.md) và [log Stripe](qa/stripe-e2e-2026-11-08.txt). Chưa chạy với tài khoản Stripe thật.
 
 **Phép thử ngược.** Gài lần lượt 16 lỗi cố ý vào code, mỗi lần chạy lại test của màn đó. Cả 16 lần test đều báo lỗi. Có thể tự lặp lại bằng cách sửa đúng dòng rồi chạy `flutter test <file>`:
 
