@@ -236,15 +236,18 @@ public class PaymentService(ShopDbContext db, IConfiguration config, IHttpClient
         var secret = config["Payments:Stripe:WebhookSecret"];
         ShopGuard.Require(secret?.StartsWith("whsec_", StringComparison.Ordinal) == true, "Thiếu webhook secret.", 503);
         ShopGuard.Require(VerifySignature(payload, signature, secret!), "Chữ ký Stripe không hợp lệ.", 400);
-        using var doc = JsonDocument.Parse(payload);
+        using var doc = ParseWebhook(payload);
         var root = doc.RootElement;
-        var eventId = root.GetProperty("id").GetString() ?? "";
-        var type = root.GetProperty("type").GetString() ?? "";
-        ShopGuard.Require(eventId.Length > 0, "Webhook thiếu event id.");
+        var eventId = WebhookString(root, "id");
+        var type = WebhookString(root, "type");
         // Other events (payment_intent.*, charge.*) are about objects that are not Checkout pages.
         if (!StripeEvents.Contains(type)) return false;
-        var session = root.GetProperty("data").GetProperty("object");
-        var sessionId = session.GetProperty("id").GetString();
+        ShopGuard.Require(root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("object", out var value) && value.ValueKind == JsonValueKind.Object,
+            "Dữ liệu webhook Stripe không hợp lệ.", 400);
+        var session = data.GetProperty("object");
+        // A missing/null id must never match payments whose Checkout page has not been created yet.
+        var sessionId = WebhookString(session, "id");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         if (await db.PaymentWebhookEvents.AnyAsync(e => e.EventId == eventId)) return false;
         var payment = await db.Payments.SingleOrDefaultAsync(p => p.ExternalSessionId == sessionId);
@@ -254,7 +257,8 @@ public class PaymentService(ShopDbContext db, IConfiguration config, IHttpClient
         var order = ShopGuard.Found(await db.Orders.FindAsync(payment!.OrderId), "đơn hàng");
         if (type is "checkout.session.completed" or "checkout.session.async_payment_succeeded")
         {
-            var paid = session.TryGetProperty("payment_status", out var status) && status.GetString() == "paid";
+            var paid = session.TryGetProperty("payment_status", out var status)
+                && status.ValueKind == JsonValueKind.String && status.GetString() == "paid";
             if (paid) await SetPaymentResult(order, payment, true);
         }
         else if (type == "checkout.session.async_payment_failed")
@@ -317,8 +321,24 @@ public class PaymentService(ShopDbContext db, IConfiguration config, IHttpClient
     }
 
     private static bool ReachedExpiry(JsonElement session) =>
-        session.TryGetProperty("expires_at", out var at) && at.TryGetInt64(out var unix)
+        session.TryGetProperty("expires_at", out var at) && at.ValueKind == JsonValueKind.Number && at.TryGetInt64(out var unix)
         && unix <= (DateTimeOffset.UtcNow + ClockMargin).ToUnixTimeSeconds();
+
+    // Webhooks are read as raw text for signature verification, so the endpoint's JSON binding
+    // cannot reject malformed bodies. Validate them here before looking up or changing a payment.
+    private static JsonDocument ParseWebhook(string payload)
+    {
+        try { return JsonDocument.Parse(payload); }
+        catch (JsonException) { throw new ShopException(400, "Dữ liệu webhook Stripe không hợp lệ."); }
+    }
+
+    private static string WebhookString(JsonElement value, string name)
+    {
+        ShopGuard.Require(value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var property)
+            && property.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(property.GetString()),
+            "Dữ liệu webhook Stripe không hợp lệ.", 400);
+        return value.GetProperty(name).GetString()!;
+    }
 
     private static bool VerifySignature(string payload, string header, string secret)
     {
