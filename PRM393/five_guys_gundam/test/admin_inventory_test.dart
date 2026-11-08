@@ -153,13 +153,32 @@ void main() {
     );
   });
 
-  testWidgets('I9 xuất quá tồn bị API từ chối, tồn giữ nguyên', (tester) async {
-    await pumpInventory(tester);
-    await submitStock(tester, '-100', 'Kiểm kê');
+  testWidgets(
+    'I9 xuất quá tồn đang hiển thị thì báo số còn lại, không gọi API',
+    (tester) async {
+      final api = await pumpInventory(tester);
+      await submitStock(tester, '-100', 'Kiểm kê');
+
+      expect(find.text('Chỉ còn 5 trong kho, xuất tối đa 5'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(
+        api.called('POST', '/api/v1/variants/v-std/stock-adjustments'),
+        isFalse,
+      );
+      expect(find.text('450.000 ₫ · Tồn 5 · Đang bán'), findsOneWidget);
+    },
+  );
+
+  testWidgets('I17 tồn đổi sau khi tải màn: API vẫn từ chối, form giữ nguyên', (
+    tester,
+  ) async {
+    final api = await pumpInventory(tester);
+    api.variants.first['stock'] = 2; // người khác vừa xuất bớt
+    await submitStock(tester, '-4', 'Kiểm kê');
 
     expect(find.text('Tồn kho không hợp lệ.'), findsOneWidget);
     expect(find.byType(AlertDialog), findsOneWidget);
-    expect(find.text('450.000 ₫ · Tồn 5 · Đang bán'), findsOneWidget);
+    expect(api.variants.first['stock'], 2);
   });
 
   testWidgets('I10 ngừng bán SKU gửi DELETE', (tester) async {
@@ -241,4 +260,27 @@ void main() {
     expect(find.text('Sản phẩm đã ngừng bán.'), findsOneWidget);
     expect(api.variants.first['isActive'], isFalse);
   });
+
+  testWidgets(
+    'I16 mặc định chọn sản phẩm đang bán và đánh dấu sản phẩm ngừng',
+    (tester) async {
+      final api = FakeShopApi().seed();
+      api.products.insert(0, {
+        ...api.products.first,
+        'id': 'p-old',
+        'name': 'Aerial Gundam',
+        'slug': 'aerial',
+        'isActive': false,
+      });
+      await pumpInventory(tester, api);
+
+      // Sản phẩm ngừng bán đứng đầu danh sách nhưng không được chọn sẵn.
+      expect(find.text('FREEDOM-STD · Standard'), findsOneWidget);
+      expect(api.called('GET', '/api/v1/products/p-old/variants'), isFalse);
+
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      expect(find.text('Aerial Gundam · Ngừng bán'), findsOneWidget);
+    },
+  );
 }

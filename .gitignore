@@ -5,3 +5,6 @@ tools/node_modules/
 *.suo
 outputs/**/*.inspect.ndjson
 outputs/**/*preview.png
+
+# Ảnh sản phẩm admin tải lên lúc chạy thử
+GundamShop.Api/uploads/

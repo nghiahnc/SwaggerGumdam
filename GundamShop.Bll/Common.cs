@@ -51,6 +51,7 @@ public class ProductODataDto
     public string Scale { get; set; } = "";
     public string Category { get; set; } = "";
     public long? FromPriceVnd { get; set; }
+    public string? ImageUrl { get; set; }
 }
 public record VariantRequest(Guid ProductId, [property: Required, MaxLength(64)] string Sku, [property: Required] string Label, [property: Range(1, long.MaxValue)] long PriceVnd, [property: Range(0, int.MaxValue)] int InitialStock);
 public record VariantUpdateRequest([property: Required] string Label, [property: Range(1, long.MaxValue)] long PriceVnd, bool IsActive);

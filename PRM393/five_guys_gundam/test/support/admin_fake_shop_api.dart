@@ -85,8 +85,27 @@ class FakeShopApi {
   Row? _find(List<Row> rows, String id) =>
       rows.where((r) => r['id'] == id).firstOrNull;
 
+  /// Ảnh đã nhận qua POST /products/images, theo tên file.
+  final uploads = <String, int>{};
+
+  /// Đặt thì upload chờ tới khi hoàn thành, để test thấy trạng thái đang tải.
+  Future<void>? uploadGate;
+
   Future<http.Response> _handle(http.Request r) async {
     final path = r.url.path;
+    // Multipart không phải JSON, xử lý trước khi giải mã body.
+    if (r.method == 'POST' && path == '/api/v1/products/images') {
+      final name = RegExp(r'filename="([^"]+)"')
+          .firstMatch(latin1.decode(r.bodyBytes))
+          ?.group(1);
+      calls.add((r.method, path, {'filename': name}));
+      await uploadGate;
+      if (name == null || !RegExp(r'\.(jpe?g|png|webp)$').hasMatch(name)) {
+        return _problem('Chỉ nhận ảnh JPG, PNG hoặc WebP.', 415);
+      }
+      uploads[name] = r.bodyBytes.length;
+      return _json({'url': '/uploads/products/$name'}, 201);
+    }
     final body = r.body.isEmpty
         ? <String, dynamic>{}
         : jsonDecode(r.body) as Row;

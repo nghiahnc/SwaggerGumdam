@@ -166,4 +166,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Gundam 1'), findsOneWidget);
   });
+
+  testWidgets('tile shows the product image, robot when there is none', (
+    tester,
+  ) async {
+    const url = 'https://example.test/unicorn.jpg';
+    await tester.pumpWidget(
+      catalogApp(
+        MockClient(
+          (_) async => odata([
+            {...hit(1), 'ImageUrl': url},
+            hit(2),
+          ], 2),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final image = tester.widget<Image>(
+      find.byKey(const Key('catalog-tile-image')),
+    );
+    expect((image.image as NetworkImage).url, url);
+    // Gundam 2 has no ImageUrl: only one network image, the other is the robot.
+    expect(find.byKey(const Key('catalog-tile-image')), findsOneWidget);
+    expect(find.byIcon(Icons.smart_toy_outlined), findsWidgets);
+  });
 }

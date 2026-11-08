@@ -58,10 +58,14 @@ class ProductSearchHit {
       grade = j['Grade'] as String,
       scale = j['Scale'] as String,
       category = j['Category'] as String,
+      imageUrl = j['ImageUrl'] as String?,
       fromPriceVnd = j['FromPriceVnd'] == null
           ? null
           : asInt(j['FromPriceVnd']);
   final String id, name, grade, scale, category;
+
+  /// Ảnh đại diện; API cũ không trả trường này thì là null.
+  final String? imageUrl;
   final int? fromPriceVnd;
 }
 

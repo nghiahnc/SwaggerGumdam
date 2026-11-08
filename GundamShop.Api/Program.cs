@@ -6,6 +6,7 @@ using GundamShop.Dal;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Microsoft.OData.ModelBuilder;
@@ -60,6 +61,13 @@ app.UseMiddleware<ApiExceptionMiddleware>();
 if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
 app.UseRouting();
 if (app.Environment.IsDevelopment()) app.UseCors("FlutterWebDevelopment");
+// After CORS: Flutter web only draws an image whose response carries the CORS header.
+Directory.CreateDirectory(ProductImages.Folder(app.Environment));
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(Path.Combine(app.Environment.ContentRootPath, "uploads")),
+    RequestPath = ProductImages.RequestPath
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

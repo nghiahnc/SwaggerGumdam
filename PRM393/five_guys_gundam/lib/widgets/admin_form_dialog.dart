@@ -15,12 +15,16 @@ class AdminFormDialog extends StatefulWidget {
     required this.onSubmit,
     this.submitLabel = 'Lưu',
     this.width = 420,
+    this.busy = false,
     super.key,
   });
 
   final String title;
   final String submitLabel;
   final double width;
+
+  /// Form đang làm việc riêng (ví dụ tải ảnh), tạm khóa nút lưu.
+  final bool busy;
 
   /// Các ô nhập, nằm trong `Form` của dialog.
   final Widget child;
@@ -93,7 +97,7 @@ class _AdminFormDialogState extends State<AdminFormDialog> {
             child: const Text('Hủy'),
           ),
           FilledButton(
-            onPressed: saving ? null : submit,
+            onPressed: saving || widget.busy ? null : submit,
             child: Text(widget.submitLabel),
           ),
         ],

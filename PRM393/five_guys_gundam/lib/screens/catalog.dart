@@ -304,6 +304,34 @@ class _GradePill extends StatelessWidget {
   );
 }
 
+/// Ảnh trên thẻ sản phẩm: phủ kín khung. Chưa có ảnh hoặc ảnh lỗi thì hiện
+/// hình robot như cũ.
+class _TileImage extends StatelessWidget {
+  const _TileImage(this.url);
+  final String? url;
+
+  static const _placeholder = FittedBox(
+    fit: BoxFit.cover,
+    clipBehavior: Clip.hardEdge,
+    child: ProductArt(size: 140, width: 180),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final url = this.url;
+    if (url == null || url.isEmpty) return _placeholder;
+    return Image.network(
+      url,
+      key: const Key('catalog-tile-image'),
+      fit: BoxFit.cover,
+      // Khung thẻ rất dẹt: cắt giữa ảnh thì chỉ thấy thân, mất phần đầu mô
+      // hình. Lệch lên phần ba trên để giữ phần đầu.
+      alignment: const Alignment(0, -0.6),
+      errorBuilder: (_, _, _) => _placeholder,
+    );
+  }
+}
+
 class _ProductTile extends StatelessWidget {
   const _ProductTile(this.item);
   final ProductSearchHit item;
@@ -321,14 +349,10 @@ class _ProductTile extends StatelessWidget {
       children: [
         Stack(
           children: [
-            const SizedBox(
+            SizedBox(
               height: 140,
               width: double.infinity,
-              child: FittedBox(
-                fit: BoxFit.cover,
-                clipBehavior: Clip.hardEdge,
-                child: ProductArt(size: 140, width: 180),
-              ),
+              child: _TileImage(item.imageUrl),
             ),
             Positioned(
               left: 8,

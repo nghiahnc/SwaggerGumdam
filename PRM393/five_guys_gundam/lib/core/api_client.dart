@@ -26,10 +26,31 @@ class ApiClient {
       request.headers['Content-Type'] = 'application/json';
       request.body = jsonEncode(body);
     }
+    return _send(request);
+  }
+
+  /// Gửi một file dạng multipart/form-data, ô tên [field].
+  Future<dynamic> upload(
+    String path, {
+    required String field,
+    required String filename,
+    required List<int> bytes,
+  }) {
+    final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'))
+      ..headers['Accept'] = 'application/json'
+      ..files.add(
+        http.MultipartFile.fromBytes(field, bytes, filename: filename),
+      );
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    return _send(request, timeout: const Duration(seconds: 60));
+  }
+
+  Future<dynamic> _send(
+    http.BaseRequest request, {
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
     try {
-      final streamed = await _client
-          .send(request)
-          .timeout(const Duration(seconds: 15));
+      final streamed = await _client.send(request).timeout(timeout);
       final response = await http.Response.fromStream(streamed);
       dynamic payload;
       try {

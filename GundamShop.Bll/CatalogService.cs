@@ -121,7 +121,7 @@ public class CatalogService(ShopDbContext db)
     public IQueryable<ProductODataDto> ODataProducts() => db.Products.AsNoTracking()
         .Where(x => x.IsActive && x.Category.IsActive)
         .Select(x => new ProductODataDto { Id = x.Id, Name = x.Name, Slug = x.Slug, Grade = x.Grade, Scale = x.Scale,
-            Category = x.Category.Name, FromPriceVnd = db.Variants.Where(v => v.ProductId == x.Id && v.IsActive).Select(v => (long?)v.PriceVnd).Min() });
+            Category = x.Category.Name, ImageUrl = x.ImageUrl, FromPriceVnd = db.Variants.Where(v => v.ProductId == x.Id && v.IsActive).Select(v => (long?)v.PriceVnd).Min() });
 
     private static void Copy(ProductRequest i, Product x)
     {

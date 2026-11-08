@@ -199,6 +199,23 @@ class ShopRepository {
           ),
         ),
       );
+
+  /// Tải ảnh sản phẩm lên API, trả về URL đầy đủ để lưu vào `imageUrl`.
+  Future<String> uploadProductImage(String filename, List<int> bytes) async {
+    final path =
+        asJson(
+              await api.upload(
+                '/api/v1/products/images',
+                field: 'file',
+                filename: filename,
+                bytes: bytes,
+              ),
+            )['url']
+            as String;
+    // API trả đường dẫn tương đối. Ghép với địa chỉ API mà app đang dùng.
+    return '${api.baseUrl}$path';
+  }
+
   Future<void> deleteProduct(String id) async =>
       api.request('DELETE', '/api/v1/products/$id');
   Future<Variant> saveVariant(Json body, {String? id}) async =>

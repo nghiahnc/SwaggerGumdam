@@ -34,7 +34,11 @@ class _AdminInventoryScreenState extends State<AdminInventoryScreen> {
     final repo = context.read<ShopRepository>();
     future = (() async {
       final products = await repo.adminProducts();
-      productId ??= products.firstOrNull?.id;
+      // Mặc định chọn sản phẩm đang bán: sản phẩm ngừng bán không thêm SKU được.
+      productId ??=
+          (products.where((p) => p.isActive).firstOrNull ??
+                  products.firstOrNull)
+              ?.id;
       final variants = productId == null
           ? <Variant>[]
           : await repo.variants(productId!);
@@ -65,6 +69,7 @@ class _AdminInventoryScreenState extends State<AdminInventoryScreen> {
       context: context,
       barrierDismissible: false,
       builder: (_) => StockDialog(
+        stock: variant.stock,
         onSave: (delta, reason) => repo.adjustStock(variant.id, delta, reason),
       ),
     );
@@ -132,8 +137,11 @@ class _AdminInventoryScreenState extends State<AdminInventoryScreen> {
                           (p) => DropdownMenuItem(
                             value: p.id,
                             child: Text(
-                              p.name,
+                              p.isActive ? p.name : '${p.name} · Ngừng bán',
                               overflow: TextOverflow.ellipsis,
+                              style: p.isActive
+                                  ? null
+                                  : const TextStyle(color: Hud.muted),
                             ),
                           ),
                         )
@@ -342,9 +350,13 @@ class _VariantDialogState extends State<VariantDialog> {
 }
 
 /// UC28: form điều chỉnh tồn. Số dương là nhập, số âm là xuất.
+///
+/// [stock] là tồn đang hiển thị: xuất quá số này thì báo ngay, khỏi gọi API.
+/// API vẫn kiểm tra lại vì tồn có thể đổi sau khi màn hình tải.
 class StockDialog extends StatefulWidget {
-  const StockDialog({required this.onSave, super.key});
+  const StockDialog({required this.onSave, this.stock, super.key});
   final Future<void> Function(int delta, String reason) onSave;
+  final int? stock;
   @override
   State<StockDialog> createState() => _StockDialogState();
 }
@@ -371,7 +383,15 @@ class _StockDialogState extends State<StockDialog> {
             if (delta == null || delta == 0) {
               return 'Nhập số nguyên khác 0';
             }
-            return delta.abs() > maxStock ? 'Vượt giới hạn $maxStock' : null;
+            if (delta.abs() > maxStock) return 'Vượt giới hạn $maxStock';
+            final stock = widget.stock;
+            if (stock != null && stock + delta < 0) {
+              return 'Chỉ còn $stock trong kho, xuất tối đa $stock';
+            }
+            if (stock != null && stock + delta > maxStock) {
+              return 'Tồn sau điều chỉnh vượt $maxStock';
+            }
+            return null;
           },
           onSaved: (v) => delta = int.parse(v!),
         ),

@@ -1,4 +1,5 @@
 using GundamShop.Bll;
+using Microsoft.AspNetCore.Mvc;
 
 namespace GundamShop.Api;
 
@@ -32,6 +33,15 @@ public static class ShopRoutes
         products.MapPost("/", async (ProductRequest i, CatalogService s) => Results.Created("/api/v1/products", await s.AddProduct(i))).RequireAuthorization("Admin");
         products.MapPut("/{id:guid}", async (Guid id, ProductRequest i, CatalogService s) => Results.Ok(await s.UpdateProduct(id, i))).RequireAuthorization("Admin");
         products.MapDelete("/{id:guid}", async (Guid id, CatalogService s) => { await s.DeleteProduct(id); return Results.NoContent(); }).RequireAuthorization("Admin");
+        // Bearer token, no cookie: antiforgery is not needed and would turn every upload into a 500.
+        // The size limit stops Kestrel from reading a huge body before Save() can refuse it.
+        products.MapPost("/images", async (IFormFile file, IWebHostEnvironment env) =>
+            {
+                var url = await ProductImages.Save(file, env);
+                return Results.Created(url, new { url });
+            })
+            .RequireAuthorization("Admin").DisableAntiforgery()
+            .WithMetadata(new RequestSizeLimitAttribute(ProductImages.MaxBytes + 64 * 1024));
         products.MapGet("/{id:guid}/variants", async (Guid id, int? page, int? pageSize, HttpContext h, CatalogService s) => Results.Ok(await s.Variants(id, page ?? 1, pageSize ?? 20, h.User.IsInRole("Admin"))));
         products.MapGet("/{id:guid}/reviews", async (Guid id, int? page, int? pageSize, PromotionService s) => Results.Ok(await s.Reviews(id, page ?? 1, pageSize ?? 20)));
 
