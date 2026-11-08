@@ -53,6 +53,15 @@ class _AddressesScreenState extends State<AddressesScreen> {
     }
   }
 
+  /// Màn chi tiết có thể sửa hoặc xóa, nên quay về là tải lại danh sách.
+  Future<void> openDetail(Address address) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AddressDetailScreen(id: address.id)),
+    );
+    if (mounted) reload();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Địa chỉ giao hàng')),
@@ -80,6 +89,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
                   '${a.display}${a.isDefault ? '\nMặc định' : ''}',
                 ),
                 isThreeLine: a.isDefault,
+                onTap: () => openDetail(a),
                 trailing: PopupMenuButton<String>(
                   onSelected: (choice) =>
                       choice == 'edit' ? edit(a) : remove(a),
@@ -92,6 +102,117 @@ class _AddressesScreenState extends State<AddressesScreen> {
             );
           },
         ),
+      ),
+    ),
+  );
+}
+
+/// UC05: đọc lại một địa chỉ từ `GET /addresses/{id}`. API chỉ tìm trong địa
+/// chỉ của tài khoản đang đăng nhập, nên id sai hoặc của người khác là 404.
+class AddressDetailScreen extends StatefulWidget {
+  const AddressDetailScreen({required this.id, super.key});
+  final String id;
+  @override
+  State<AddressDetailScreen> createState() => _AddressDetailScreenState();
+}
+
+class _AddressDetailScreenState extends State<AddressDetailScreen> {
+  late Future<Address> future;
+  bool busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    future = fetch();
+  }
+
+  Future<Address> fetch() => context.read<ShopRepository>().address(widget.id);
+
+  void reload() => setState(() {
+    future = fetch();
+  });
+
+  Future<void> edit(Address current) async {
+    final body = await showDialog<Json>(
+      context: context,
+      builder: (_) => AddressFormDialog(existing: current),
+    );
+    if (body == null || !mounted) return;
+    setState(() => busy = true);
+    try {
+      await context.read<ShopRepository>().saveAddress(body, id: current.id);
+      if (!mounted) return;
+      showSuccess(context, 'Đã lưu địa chỉ');
+      reload();
+    } catch (error) {
+      if (mounted) showError(context, error);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> remove(Address current) async {
+    if (!await confirm(context, 'Xóa địa chỉ của ${current.recipient}?') ||
+        !mounted) {
+      return;
+    }
+    setState(() => busy = true);
+    try {
+      await context.read<ShopRepository>().deleteAddress(current.id);
+      if (!mounted) return;
+      showSuccess(context, 'Đã xóa địa chỉ');
+      Navigator.pop(context);
+    } catch (error) {
+      if (mounted) {
+        setState(() => busy = false);
+        showError(context, error);
+      }
+    }
+  }
+
+  Widget info(String label, String value) => ListTile(
+    contentPadding: EdgeInsets.zero,
+    title: Text(label, style: Theme.of(context).textTheme.labelMedium),
+    subtitle: Text(value, style: Theme.of(context).textTheme.bodyLarge),
+  );
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Chi tiết địa chỉ')),
+    body: AsyncPanel<Address>(
+      future: future,
+      onRetry: reload,
+      builder: (a) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          info('Người nhận', a.recipient),
+          info('Điện thoại', a.phone),
+          info('Số nhà / đường', a.line1),
+          info('Phường / xã', a.ward),
+          info('Quận / huyện', a.district),
+          info('Tỉnh / thành phố', a.province),
+          info('Mặc định', a.isDefault ? 'Có' : 'Không'),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: busy ? null : () => edit(a),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Sửa'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: busy ? null : () => remove(a),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Xóa'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     ),
   );

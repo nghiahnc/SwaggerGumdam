@@ -1,25 +1,37 @@
 import 'api_client.dart';
 import 'models.dart';
 
+/// UC10: sort orders of the catalog. Each ends on unique keys (Name, Id) so
+/// that $skip paging over equal prices or names is stable.
+///
+/// Products without an active SKU have no price (null). SQL Server puts null
+/// first when ascending, so "cheapest first" sorts on `FromPriceVnd eq null`
+/// first to keep them at the end; descending already puts them last.
+enum CatalogSort {
+  nameAsc('Tên A → Z', 'Name,Id'),
+  nameDesc('Tên Z → A', 'Name desc,Id'),
+  priceAsc('Giá thấp → cao', 'FromPriceVnd eq null,FromPriceVnd,Name,Id'),
+  priceDesc('Giá cao → thấp', 'FromPriceVnd desc,Name,Id');
+
+  const CatalogSort(this.label, this.orderBy);
+  final String label;
+  final String orderBy;
+}
+
 class ShopRepository {
   ShopRepository(this.api);
   final ApiClient api;
 
+  // Đọc đủ mọi trang: API trả tối đa 100 dòng một trang, lấy một trang thì
+  // danh mục, sản phẩm hay SKU thứ 101 trở đi sẽ mất mà không báo gì.
   Future<List<Category>> categories() async =>
-      pageItems(await api.request('GET', '/api/v1/categories?pageSize=100'))
-          .map(Category.fromJson)
-          .toList();
+      (await _allPages('/api/v1/categories')).map(Category.fromJson).toList();
   Future<Category> category(String id) async => Category.fromJson(
     asJson(await api.request('GET', '/api/v1/categories/$id')),
   );
 
-  Future<List<Product>> products({int page = 1}) async => pageItems(
-    await api.request('GET', '/api/v1/products?page=$page&pageSize=20'),
-  ).map(Product.fromJson).toList();
   Future<List<Product>> adminProducts() async =>
-      pageItems(await api.request('GET', '/api/v1/products?pageSize=100'))
-          .map(Product.fromJson)
-          .toList();
+      (await _allPages('/api/v1/products')).map(Product.fromJson).toList();
 
   static const catalogPageSize = 20;
 
@@ -27,6 +39,7 @@ class ShopRepository {
     String query = '',
     String? grade,
     int skip = 0,
+    CatalogSort sort = CatalogSort.nameAsc,
   }) async {
     final filters = <String>[];
     if (query.trim().isNotEmpty) {
@@ -37,7 +50,7 @@ class ShopRepository {
       filters.add("Grade eq '${grade.replaceAll("'", "''")}'");
     }
     final parameters = <String, String>{
-      r'$orderby': 'Name',
+      r'$orderby': sort.orderBy,
       r'$top': '$catalogPageSize',
       r'$skip': '$skip',
       r'$count': 'true',
@@ -54,9 +67,15 @@ class ShopRepository {
   Future<Product> product(String id) async => Product.fromJson(
     asJson(await api.request('GET', '/api/v1/products/$id')),
   );
-  Future<List<Variant>> variants(String id) async => pageItems(
-    await api.request('GET', '/api/v1/products/$id/variants?pageSize=100'),
-  ).map(Variant.fromJson).toList();
+  Future<List<Variant>> variants(String id) async =>
+      (await _allPages('/api/v1/products/$id/variants'))
+          .map(Variant.fromJson)
+          .toList();
+
+  /// UC14: reads one SKU again, so its price and stock are current.
+  Future<Variant> variant(String id) async => Variant.fromJson(
+    asJson(await api.request('GET', '/api/v1/variants/$id')),
+  );
 
   /// Every review of the product: the own review and the average must not
   /// depend on whether it is among the newest 100.
@@ -74,6 +93,11 @@ class ShopRepository {
       asJsonList(await api.request('GET', '/api/v1/addresses'))
           .map(Address.fromJson)
           .toList();
+
+  /// UC05: the API only finds addresses of the signed-in account (404 otherwise).
+  Future<Address> address(String id) async => Address.fromJson(
+    asJson(await api.request('GET', '/api/v1/addresses/$id')),
+  );
   Future<Address> saveAddress(Json body, {String? id}) async =>
       Address.fromJson(
         asJson(
@@ -91,6 +115,11 @@ class ShopRepository {
       asJsonList(await api.request('GET', '/api/v1/cart/items'))
           .map(CartLine.fromJson)
           .toList();
+
+  /// UC30: one line of the own cart, with the current price (404 if not yours).
+  Future<CartLine> cartItem(String id) async => CartLine.fromJson(
+    asJson(await api.request('GET', '/api/v1/cart/items/$id')),
+  );
   Future<void> addToCart(String variantId, int quantity) async => api.request(
     'POST',
     '/api/v1/cart/items',
@@ -114,8 +143,15 @@ class ShopRepository {
           ),
         ),
       );
+
+  /// Số đơn mỗi trang; màn Đơn dùng cùng số này để biết còn trang sau không.
+  static const ordersPageSize = 20;
+
   Future<List<ShopOrder>> orders({int page = 1}) async => pageItems(
-    await api.request('GET', '/api/v1/orders?page=$page&pageSize=20'),
+    await api.request(
+      'GET',
+      '/api/v1/orders?page=$page&pageSize=$ordersPageSize',
+    ),
   ).map(ShopOrder.fromJson).toList();
   Future<ShopOrder> order(String id) async => ShopOrder.fromJson(
     asJson(await api.request('GET', '/api/v1/orders/$id')),

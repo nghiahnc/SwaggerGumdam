@@ -19,6 +19,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
   // Từ khóa đã gửi đi; phân trang dùng giá trị này chứ không dùng chữ đang gõ.
   String query = '';
   String grade = '';
+  // UC10: thứ tự sắp xếp; đổi thứ tự thì về trang đầu như khi đổi bộ lọc.
+  CatalogSort sort = CatalogSort.nameAsc;
   int skip = 0;
   late Future<ProductSearchPage> future;
 
@@ -35,6 +37,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
       query: query,
       grade: grade,
       skip: skip,
+      sort: sort,
     );
   });
 
@@ -110,6 +113,34 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   skip = 0;
                   reload();
                 },
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+          child: Row(
+            children: [
+              const Icon(Icons.sort, size: 20),
+              const SizedBox(width: 8),
+              const Text('Sắp xếp'),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButton<CatalogSort>(
+                  key: const Key('catalog-sort'),
+                  isExpanded: true,
+                  value: sort,
+                  items: [
+                    for (final s in CatalogSort.values)
+                      DropdownMenuItem(value: s, child: Text(s.label)),
+                  ],
+                  onChanged: (v) {
+                    if (v == null || v == sort) return;
+                    sort = v;
+                    skip = 0;
+                    reload();
+                  },
+                ),
               ),
             ],
           ),

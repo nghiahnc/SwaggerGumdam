@@ -49,6 +49,15 @@ class _ProductScreenState extends State<ProductScreen> {
     return value.clamp(1, max < 1 ? 1 : max);
   }
 
+  /// Giá và tồn có thể đã đổi trong lúc xem, nên quay về là tải lại.
+  Future<void> openVariant(Variant variant) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => VariantDetailScreen(id: variant.id)),
+    );
+    if (mounted) reload();
+  }
+
   void select(Variant variant) => setState(() {
     selectedVariant = variant.id;
     quantity = _clampQuantity(quantity, variant);
@@ -158,6 +167,12 @@ class _ProductScreenState extends State<ProductScreen> {
                       ? Icons.radio_button_checked
                       : Icons.radio_button_unchecked,
                 ),
+                // Nút riêng, vì chạm vào dòng là chọn SKU; SKU hết hàng vẫn xem được.
+                trailing: IconButton(
+                  tooltip: 'Chi tiết SKU ${variant.sku}',
+                  icon: const Icon(Icons.info_outline),
+                  onPressed: () => openVariant(variant),
+                ),
                 onTap: variant.stock > 0 ? () => select(variant) : null,
               ),
             const SizedBox(height: 8),
@@ -223,6 +238,60 @@ class _ProductScreenState extends State<ProductScreen> {
           ],
         );
       },
+    ),
+  );
+}
+
+/// UC14: đọc lại một SKU từ `GET /variants/{id}`. Khách chỉ thấy SKU đang bán
+/// của sản phẩm và danh mục đang bán; SKU khác API trả 404.
+class VariantDetailScreen extends StatefulWidget {
+  const VariantDetailScreen({required this.id, super.key});
+  final String id;
+  @override
+  State<VariantDetailScreen> createState() => _VariantDetailScreenState();
+}
+
+class _VariantDetailScreenState extends State<VariantDetailScreen> {
+  late Future<Variant> future;
+
+  @override
+  void initState() {
+    super.initState();
+    future = fetch();
+  }
+
+  Future<Variant> fetch() => context.read<ShopRepository>().variant(widget.id);
+
+  void reload() => setState(() {
+    future = fetch();
+  });
+
+  Widget info(String label, String value) => ListTile(
+    contentPadding: EdgeInsets.zero,
+    title: Text(label, style: Theme.of(context).textTheme.labelMedium),
+    subtitle: Text(value, style: Theme.of(context).textTheme.bodyLarge),
+  );
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Chi tiết SKU')),
+    body: AsyncPanel<Variant>(
+      future: future,
+      onRetry: reload,
+      builder: (v) => RefreshIndicator(
+        onRefresh: () async => reload(),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
+            info('Mã SKU', v.sku),
+            info('Phiên bản', v.label),
+            info('Giá', money(v.priceVnd)),
+            info('Tồn kho', v.stock > 0 ? '${v.stock}' : 'Hết hàng'),
+            info('Trạng thái', v.isActive ? 'Đang bán' : 'Ngừng bán'),
+          ],
+        ),
+      ),
     ),
   );
 }

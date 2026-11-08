@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/api_client.dart';
+import '../core/cart_policy.dart';
 import '../core/models.dart';
 import '../core/session.dart';
 import '../core/shop_repository.dart';
@@ -43,7 +44,9 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> change(CartLine line, int quantity) async {
-    if (busy || quantity < 1 || quantity > 99) return;
+    if (busy || quantity < minCartQuantity || quantity > maxCartQuantity) {
+      return;
+    }
     setState(() => busy = true);
     try {
       await context.read<ShopRepository>().updateCart(line.id, quantity);
@@ -69,6 +72,15 @@ class _CartScreenState extends State<CartScreen> {
     } finally {
       if (mounted) setState(() => busy = false);
     }
+  }
+
+  /// UC30: chi tiết đọc lại từ API; số lượng có thể đã đổi ở máy khác.
+  Future<void> openDetail(CartLine line) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => CartItemDetailScreen(id: line.id)),
+    );
+    if (mounted) reload();
   }
 
   Future<void> checkout(int subtotal) async {
@@ -131,6 +143,7 @@ class _CartScreenState extends State<CartScreen> {
                                 busy: busy,
                                 onChange: (quantity) => change(line, quantity),
                                 onRemove: () => remove(line),
+                                onDetail: () => openDetail(line),
                               ),
                           ],
                         ),
@@ -155,11 +168,13 @@ class _CartLineCard extends StatelessWidget {
     required this.busy,
     required this.onChange,
     required this.onRemove,
+    required this.onDetail,
   });
   final CartLine line;
   final bool busy;
   final ValueChanged<int> onChange;
   final VoidCallback onRemove;
+  final VoidCallback onDetail;
 
   @override
   Widget build(BuildContext context) {
@@ -204,6 +219,11 @@ class _CartLineCard extends StatelessWidget {
                   ),
                 ),
                 IconButton(
+                  tooltip: 'Chi tiết mục giỏ',
+                  onPressed: onDetail,
+                  icon: const Icon(Icons.info_outline),
+                ),
+                IconButton(
                   tooltip: 'Xóa khỏi giỏ',
                   onPressed: busy ? null : onRemove,
                   color: theme.colorScheme.error,
@@ -219,10 +239,10 @@ class _CartLineCard extends StatelessWidget {
                 children: [
                   _QuantityStepper(
                     quantity: line.quantity,
-                    onMinus: !busy && line.quantity > 1
+                    onMinus: !busy && line.quantity > minCartQuantity
                         ? () => onChange(line.quantity - 1)
                         : null,
-                    onPlus: !busy && line.quantity < 99
+                    onPlus: !busy && line.quantity < maxCartQuantity
                         ? () => onChange(line.quantity + 1)
                         : null,
                   ),
@@ -388,4 +408,59 @@ class _Placeholder extends StatelessWidget {
       ),
     );
   }
+}
+
+/// UC30: đọc lại một mục giỏ từ `GET /cart/items/{id}`. API chỉ tìm trong giỏ
+/// của tài khoản đang đăng nhập, nên id sai hoặc của người khác là 404.
+class CartItemDetailScreen extends StatefulWidget {
+  const CartItemDetailScreen({required this.id, super.key});
+  final String id;
+  @override
+  State<CartItemDetailScreen> createState() => _CartItemDetailScreenState();
+}
+
+class _CartItemDetailScreenState extends State<CartItemDetailScreen> {
+  late Future<CartLine> future;
+
+  @override
+  void initState() {
+    super.initState();
+    future = fetch();
+  }
+
+  Future<CartLine> fetch() =>
+      context.read<ShopRepository>().cartItem(widget.id);
+
+  void reload() => setState(() {
+    future = fetch();
+  });
+
+  Widget info(String label, String value) => ListTile(
+    contentPadding: EdgeInsets.zero,
+    title: Text(label, style: Theme.of(context).textTheme.labelMedium),
+    subtitle: Text(value, style: Theme.of(context).textTheme.bodyLarge),
+  );
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Chi tiết mục giỏ')),
+    body: AsyncPanel<CartLine>(
+      future: future,
+      onRetry: reload,
+      builder: (line) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          info('Sản phẩm', line.productName),
+          info('Mã SKU', line.sku),
+          info('Đơn giá hiện tại', money(line.unitPriceVnd)),
+          info('Số lượng', '${line.quantity}'),
+          info('Thành tiền', money(line.totalVnd)),
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text('Tồn kho được kiểm tra lại khi đặt hàng.'),
+          ),
+        ],
+      ),
+    ),
+  );
 }
