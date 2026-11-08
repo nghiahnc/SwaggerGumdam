@@ -65,7 +65,9 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Danh mục')),
+    appBar: AppBar(
+      title: const HudTitle('Danh mục', tag: 'Admin // Categories'),
+    ),
     floatingActionButton: FloatingActionButton.extended(
       onPressed: _add,
       icon: const Icon(Icons.add),
@@ -76,22 +78,39 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
       onRetry: _reload,
       isEmpty: (items) => items.isEmpty,
       emptyMessage: 'Chưa có danh mục nào.',
-      builder: (items) => ListView.separated(
-        padding: const EdgeInsets.only(bottom: 88),
+      builder: (items) => ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
         itemCount: items.length,
-        separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (_, index) {
           final category = items[index];
-          return ListTile(
-            leading: Icon(
-              category.isActive
-                  ? Icons.check_circle_outline
-                  : Icons.block_outlined,
-            ),
-            title: Text(category.name),
-            subtitle: Text('${category.slug} · ${_status(category)}'),
-            trailing: const Icon(Icons.chevron_right),
+          return HudCard(
             onTap: () => _openDetail(category),
+            accent: category.isActive ? Hud.green : Hud.muted,
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: category.isActive
+                      ? Hud.greenSoft
+                      : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  category.isActive
+                      ? Icons.check_circle_outline
+                      : Icons.block_outlined,
+                  color: category.isActive ? Hud.green : Hud.muted,
+                ),
+              ),
+              title: Text(
+                category.name,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: Text('${category.slug} · ${_status(category)}'),
+              trailing: const Icon(Icons.chevron_right),
+            ),
           );
         },
       ),
@@ -99,7 +118,7 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
   );
 }
 
-/// UC17: đọc lại danh mục từ `GET /categories/{id}`, không dùng dữ liệu của
+// UC17: đọc lại danh mục từ `GET /categories/{id}`, không dùng dữ liệu của
 /// màn danh sách. Từ đây có thể sửa (UC19) và ngừng bán (UC20).
 class CategoryDetailScreen extends StatefulWidget {
   const CategoryDetailScreen({required this.id, super.key});
@@ -145,17 +164,62 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Chi tiết danh mục')),
+    appBar: AppBar(
+      title: const HudTitle('Chi tiết danh mục', tag: 'Admin // Category'),
+    ),
     body: AsyncPanel<Category>(
       future: category,
       onRetry: _reload,
       builder: (current) => ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          _Info(label: 'Tên', value: current.name),
-          _Info(label: 'Slug', value: current.slug),
-          _Info(label: 'Mô tả', value: current.description ?? 'Chưa có'),
-          _Info(label: 'Trạng thái', value: _status(current)),
+          NavyPanel(
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.category_outlined, color: Hud.red),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      HudLabel('Category record', color: Color(0xFFF87171)),
+                      SizedBox(height: 2),
+                      Text(
+                        'Dữ liệu đọc trực tiếp từ máy chủ',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          HudCard(
+            margin: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            child: Column(
+              children: [
+                _Info(label: 'Tên', value: current.name),
+                _Info(label: 'Slug', value: current.slug),
+                _Info(label: 'Mô tả', value: current.description ?? 'Chưa có'),
+                _Info(
+                  label: 'Trạng thái',
+                  value: _status(current),
+                  color: current.isActive ? Hud.green : Hud.redDark,
+                  last: true,
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -186,20 +250,47 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
 }
 
 class _Info extends StatelessWidget {
-  const _Info({required this.label, required this.value});
+  const _Info({
+    required this.label,
+    required this.value,
+    this.color,
+    this.last = false,
+  });
 
   final String label;
   final String value;
+  final Color? color;
+  final bool last;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    contentPadding: EdgeInsets.zero,
-    title: Text(label, style: Theme.of(context).textTheme.labelMedium),
-    subtitle: Text(value, style: Theme.of(context).textTheme.bodyLarge),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    decoration: BoxDecoration(
+      border: last ? null : const Border(bottom: BorderSide(color: Hud.line)),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 96,
+          child: Text(label, style: const TextStyle(color: Hud.muted)),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: color ?? Hud.ink,
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
-/// UC18, UC19: form thêm và sửa danh mục.
+// UC18, UC19: form thêm và sửa danh mục.
 class CategoryForm extends StatefulWidget {
   const CategoryForm({required this.onSave, this.old, super.key});
 

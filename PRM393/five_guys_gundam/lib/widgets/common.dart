@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'hud.dart';
+
+export 'hud.dart';
+
 String money(int value) {
   final digits = value.toString();
   final reversed = digits.split('').reversed.toList();
@@ -70,20 +74,26 @@ class AsyncPanel<T> extends StatelessWidget {
     future: future,
     builder: (context, snapshot) {
       if (snapshot.connectionState != ConnectionState.done) {
-        return const Center(child: CircularProgressIndicator());
+        return const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Hud.red),
+              SizedBox(height: 12),
+              HudLabel('Đang đồng bộ dữ liệu…'),
+            ],
+          ),
+        );
       }
       if (snapshot.hasError) {
         return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.wifi_off_outlined, size: 42),
-                const SizedBox(height: 12),
-                Text(snapshot.error.toString(), textAlign: TextAlign.center),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
+          child: SingleChildScrollView(
+            child: EmptyState(
+              icon: Icons.wifi_off_outlined,
+              title: 'Không tải được dữ liệu',
+              message: snapshot.error.toString(),
+              actions: [
+                FilledButton.icon(
                   onPressed: onRetry,
                   icon: const Icon(Icons.refresh),
                   label: const Text('Thử lại'),
@@ -95,7 +105,9 @@ class AsyncPanel<T> extends StatelessWidget {
       }
       final data = snapshot.data as T;
       if (isEmpty?.call(data) ?? false) {
-        return Center(child: Text(emptyMessage));
+        return Center(
+          child: SingleChildScrollView(child: EmptyState(title: emptyMessage)),
+        );
       }
       return builder(data);
     },
@@ -103,34 +115,40 @@ class AsyncPanel<T> extends StatelessWidget {
 }
 
 class ProductArt extends StatelessWidget {
-  const ProductArt({this.url, this.size = 72, super.key});
+  const ProductArt({this.url, this.size = 72, this.width, super.key});
   final String? url;
   final double size;
+  final double? width;
+
+  Widget _placeholder(IconData icon) => Container(
+    width: width ?? size,
+    height: size,
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Color(0xFFF1F5F9), Color(0xFFE2E8F0)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+    child: Icon(
+      icon,
+      size: size * .45,
+      color: Hud.navySoft.withValues(alpha: .45),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => ClipRRect(
     borderRadius: BorderRadius.circular(12),
     child: url == null || url!.isEmpty
-        ? Container(
-            width: size,
-            height: size,
-            color: const Color(0xFFFEE2E2),
-            child: Icon(
-              Icons.smart_toy_outlined,
-              size: size * .52,
-              color: const Color(0xFFB91C1C),
-            ),
-          )
+        ? _placeholder(Icons.smart_toy_outlined)
         : Image.network(
             url!,
-            width: size,
+            width: width ?? size,
             height: size,
             fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => Container(
-              width: size,
-              height: size,
-              color: const Color(0xFFFEE2E2),
-              child: const Icon(Icons.broken_image_outlined),
-            ),
+            errorBuilder: (_, _, _) =>
+                _placeholder(Icons.broken_image_outlined),
           ),
   );
 }

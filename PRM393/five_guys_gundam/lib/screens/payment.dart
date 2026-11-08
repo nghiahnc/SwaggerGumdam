@@ -213,7 +213,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     canPop: !busy,
     child: Scaffold(
       appBar: AppBar(
-        title: const Text('Thanh toán'),
+        title: const HudTitle('Thanh toán', tag: 'Payment gateway'),
         actions: [
           IconButton(
             tooltip: 'Tải lại trạng thái',
@@ -224,7 +224,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
         bottom: busy
             ? const PreferredSize(
                 preferredSize: Size.fromHeight(4),
-                child: LinearProgressIndicator(key: Key('payment-busy')),
+                child: LinearProgressIndicator(
+                  key: Key('payment-busy'),
+                  color: Hud.red,
+                ),
               )
             : null,
       ),
@@ -232,15 +235,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
         future: future,
         onRetry: reload,
         builder: (view) => ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             _OrderSummary(order: view.order),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             if (view.problem != null)
-              Text(
-                view.problem!,
+              InfoBanner(
+                tone: Tone.danger,
+                tag: 'Gateway error',
+                message: view.problem!,
                 key: const Key('payment-problem'),
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
               )
             else if (!view.pending)
               _Outcome(order: view.order, onBack: () => Navigator.pop(context))
@@ -257,8 +261,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 onReload: checkStripe,
               )
             else
-              const Text(
-                'Chưa có trang thanh toán cho đơn này. Hãy tải lại trạng thái.',
+              const InfoBanner(
+                tone: Tone.warning,
+                message: 'Chưa có trang thanh toán cho đơn này. Hãy tải lại trạng thái.',
               ),
           ],
         ),
@@ -267,46 +272,90 @@ class _PaymentScreenState extends State<PaymentScreen> {
   );
 }
 
+Color _statusColor(ShopOrder order) {
+  if (PaymentPolicy.succeeded(
+    order.status,
+    paymentStatus: order.paymentStatus,
+  )) {
+    return Hud.green;
+  }
+  if (PaymentPolicy.needsRefund(order.paymentStatus)) {
+    return const Color(0xFFB45309);
+  }
+  if (order.status == PaymentPolicy.pending) return const Color(0xFFB45309);
+  return Hud.redDark;
+}
+
 class _OrderSummary extends StatelessWidget {
   const _OrderSummary({required this.order});
   final ShopOrder order;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Đơn ${shortOrderId(order.id)}',
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text('Tạm tính: ${money(order.subtotalVnd)}'),
-            if (order.discountVnd > 0)
-              Text('Giảm giá: ${money(order.discountVnd)}'),
-            Text(
-              order.status == PaymentPolicy.pending
-                  ? 'Cần thanh toán: ${money(order.totalVnd)}'
-                  : 'Tổng đơn: ${money(order.totalVnd)}',
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Chip(
-              key: const Key('order-status'),
-              label: Text(
+    final pending = order.status == PaymentPolicy.pending;
+    return HudCard(
+      margin: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: HudLabel('Mã đơn cockpit')),
+              StatusPill(
                 PaymentPolicy.statusLabel(
                   order.status,
                   paymentStatus: order.paymentStatus,
                 ),
+                color: _statusColor(order),
+                key: const Key('order-status'),
               ),
-              visualDensity: VisualDensity.compact,
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Đơn ${shortOrderId(order.id)}',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Hud.ink,
             ),
-          ],
-        ),
+          ),
+          const Divider(height: 24),
+          Text(
+            'Tạm tính: ${money(order.subtotalVnd)}',
+            style: const TextStyle(color: Hud.muted),
+          ),
+          if (order.discountVnd > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Giảm giá: ${money(order.discountVnd)}',
+                style: const TextStyle(
+                  color: Hud.green,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: pending ? Hud.redSoft : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              pending
+                  ? 'Cần thanh toán: ${money(order.totalVnd)}'
+                  : 'Tổng đơn: ${money(order.totalVnd)}',
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+                color: pending ? Hud.red : Hud.ink,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -318,28 +367,57 @@ class _MockActions extends StatelessWidget {
   final ValueChanged<bool> onResult;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      const Text(
-        'Chế độ thử: chọn một kết quả để kiểm tra cả luồng đơn '
-        'hàng. Thất bại sẽ đóng đơn, hoàn tồn kho và lượt voucher.',
-      ),
-      const SizedBox(height: 16),
-      FilledButton.icon(
-        key: const Key('mock-success'),
-        onPressed: busy ? null : () => onResult(true),
-        icon: const Icon(Icons.check_circle_outline),
-        label: const Text('Mô phỏng thanh toán thành công'),
-      ),
-      const SizedBox(height: 8),
-      OutlinedButton.icon(
-        key: const Key('mock-fail'),
-        onPressed: busy ? null : () => onResult(false),
-        icon: const Icon(Icons.cancel_outlined),
-        label: const Text('Mô phỏng thanh toán thất bại'),
-      ),
-    ],
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF8FAFC),
+      borderRadius: BorderRadius.circular(Hud.radius),
+      border: Border.all(color: Hud.blue.withValues(alpha: .35), width: 1.2),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.science_outlined, color: Hud.blue, size: 20),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Môi trường thử nghiệm',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+            StatusPill('Sandbox / test mode', color: Hud.blue, dot: false),
+          ],
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'Chế độ thử: chọn một kết quả để kiểm tra cả luồng đơn '
+          'hàng. Thất bại sẽ đóng đơn, hoàn tồn kho và lượt voucher.',
+          style: TextStyle(color: Hud.muted, height: 1.4),
+        ),
+        const SizedBox(height: 14),
+        FilledButton.icon(
+          key: const Key('mock-success'),
+          style: FilledButton.styleFrom(backgroundColor: Hud.green),
+          onPressed: busy ? null : () => onResult(true),
+          icon: const Icon(Icons.check_circle_outline),
+          label: const Text('Mô phỏng thanh toán thành công'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          key: const Key('mock-fail'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Hud.redDark,
+            side: BorderSide(color: Hud.red.withValues(alpha: .4)),
+            backgroundColor: Hud.redSoft,
+          ),
+          onPressed: busy ? null : () => onResult(false),
+          icon: const Icon(Icons.cancel_outlined),
+          label: const Text('Mô phỏng thanh toán thất bại'),
+        ),
+      ],
+    ),
   );
 }
 
@@ -356,24 +434,49 @@ class _StripeActions extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const Text(
-        'Thanh toán trên trang Stripe. Đơn chỉ đổi trạng thái khi Stripe báo '
-        'kết quả về máy chủ; trả xong hãy quay lại ứng dụng, màn hình tự đọc '
-        'lại trạng thái đơn.',
+      const InfoBanner(
+        icon: Icons.lock_outline,
+        tag: 'Stripe checkout',
+        message:
+            'Thanh toán trên trang Stripe. Đơn chỉ đổi trạng thái khi Stripe báo '
+            'kết quả về máy chủ; trả xong hãy quay lại ứng dụng, màn hình tự đọc '
+            'lại trạng thái đơn.',
       ),
-      if (testMode) ...[
-        const SizedBox(height: 8),
-        const Text(
-          'Chế độ thử của Stripe: dùng thẻ 4242 4242 4242 4242, ngày hết hạn '
-          'bất kỳ trong tương lai, CVC bất kỳ. Không mất tiền thật.',
-          key: Key('stripe-test-card'),
+      if (testMode)
+        Container(
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Hud.amberSoft,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Hud.amber.withValues(alpha: .5)),
+          ),
+          child: const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.credit_card, color: Color(0xFFB45309), size: 20),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Chế độ thử của Stripe: dùng thẻ 4242 4242 4242 4242, ngày hết hạn '
+                  'bất kỳ trong tương lai, CVC bất kỳ. Không mất tiền thật.',
+                  key: Key('stripe-test-card'),
+                  style: TextStyle(
+                    color: Color(0xFF92400E),
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ],
-      const SizedBox(height: 16),
+      const SizedBox(height: 12),
       FilledButton.icon(
         key: const Key('stripe-open'),
+        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
         onPressed: onOpen,
-        icon: const Icon(Icons.open_in_new),
+        icon: const Icon(Icons.credit_card),
         label: const Text('Mở Stripe Checkout'),
       ),
       const SizedBox(height: 8),
@@ -397,43 +500,70 @@ class _Outcome extends StatelessWidget {
     final status = order.status, paid = order.paymentStatus;
     final ok = PaymentPolicy.succeeded(status, paymentStatus: paid);
     final refund = PaymentPolicy.needsRefund(paid);
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Icon(
-          ok
-              ? Icons.check_circle
-              : refund
-              ? Icons.report_outlined
-              : Icons.error_outline,
-          key: Key(
-            ok
-                ? 'outcome-ok'
-                : refund
-                ? 'outcome-refund'
-                : 'outcome-failed',
+    final color = ok
+        ? Hud.green
+        : refund
+        ? const Color(0xFFB45309)
+        : Hud.redDark;
+    return HudCard(
+      margin: EdgeInsets.zero,
+      borderColor: color.withValues(alpha: .35),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: .12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                ok
+                    ? Icons.check_circle
+                    : refund
+                    ? Icons.report_outlined
+                    : Icons.error_outline,
+                key: Key(
+                  ok
+                      ? 'outcome-ok'
+                      : refund
+                      ? 'outcome-refund'
+                      : 'outcome-failed',
+                ),
+                size: 48,
+                color: color,
+              ),
+            ),
           ),
-          size: 56,
-          color: ok
-              ? Colors.green.shade700
-              : refund
-              ? Colors.orange.shade800
-              : scheme.error,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          PaymentPolicy.outcome(status, paymentStatus: paid),
-          key: const Key('payment-outcome'),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 20),
-        FilledButton(
-          key: const Key('payment-back'),
-          onPressed: onBack,
-          child: const Text('Quay lại đơn hàng'),
-        ),
-      ],
+          const SizedBox(height: 10),
+          Center(
+            child: HudLabel(
+              ok
+                  ? 'Transaction complete'
+                  : refund
+                  ? 'Refund required'
+                  : 'Transaction closed',
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            PaymentPolicy.outcome(status, paymentStatus: paid),
+            key: const Key('payment-outcome'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(height: 1.45, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            key: const Key('payment-back'),
+            onPressed: onBack,
+            child: const Text('Quay lại đơn hàng'),
+          ),
+        ],
+      ),
     );
   }
 }

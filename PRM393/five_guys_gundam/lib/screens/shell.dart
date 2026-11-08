@@ -29,32 +29,42 @@ class _ShopShellState extends State<ShopShell> {
     if (index >= pages.length) index = 0;
     return Scaffold(
       body: pages[index],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (value) => setState(() => index = value),
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.storefront_outlined),
-            label: 'Cửa hàng',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.shopping_cart_outlined),
-            label: 'Giỏ',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            label: 'Đơn',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            label: 'Tài khoản',
-          ),
-          if (isAdmin)
+      bottomNavigationBar: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+        ),
+        child: NavigationBar(
+          selectedIndex: index,
+          onDestinationSelected: (value) => setState(() => index = value),
+          destinations: [
             const NavigationDestination(
-              icon: Icon(Icons.admin_panel_settings_outlined),
-              label: 'Quản trị',
+              icon: Icon(Icons.storefront_outlined),
+              selectedIcon: Icon(Icons.storefront),
+              label: 'Cửa hàng',
             ),
-        ],
+            const NavigationDestination(
+              icon: Icon(Icons.shopping_cart_outlined),
+              selectedIcon: Icon(Icons.shopping_cart),
+              label: 'Giỏ',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.receipt_long_outlined),
+              selectedIcon: Icon(Icons.receipt_long),
+              label: 'Đơn',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Tài khoản',
+            ),
+            if (isAdmin)
+              const NavigationDestination(
+                icon: Icon(Icons.admin_panel_settings_outlined),
+                selectedIcon: Icon(Icons.admin_panel_settings),
+                label: 'Quản trị',
+              ),
+          ],
+        ),
       ),
     );
   }

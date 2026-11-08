@@ -95,11 +95,15 @@ class _CartScreenState extends State<CartScreen> {
   Widget build(BuildContext context) {
     final signedIn = context.watch<SessionController>().isSignedIn;
     return Scaffold(
-      appBar: AppBar(title: const Text('Giỏ hàng')),
+      appBar: AppBar(
+        title: const HudTitle('Giỏ hàng', tag: 'FiveGuys // Payload'),
+      ),
       body: !signedIn
           ? _Placeholder(
+              icon: Icons.lock_outline,
               message: 'Đăng nhập để xem giỏ hàng của bạn.',
-              action: FilledButton(
+              hint: 'Giỏ hàng được đồng bộ theo tài khoản phi công.',
+              action: FilledButton.icon(
                 onPressed: () async {
                   await Navigator.push(
                     context,
@@ -107,7 +111,8 @@ class _CartScreenState extends State<CartScreen> {
                   );
                   if (mounted) reload();
                 },
-                child: const Text('Đăng nhập để xem giỏ'),
+                icon: const Icon(Icons.login),
+                label: const Text('Đăng nhập để xem giỏ'),
               ),
             )
           : AsyncPanel<List<CartLine>>(
@@ -130,13 +135,38 @@ class _CartScreenState extends State<CartScreen> {
                 );
                 return Column(
                   children: [
-                    if (busy) const LinearProgressIndicator(minHeight: 2),
+                    _ManifestBar(lines: items.length),
+                    if (busy)
+                      const LinearProgressIndicator(
+                        minHeight: 2,
+                        color: Hud.red,
+                      ),
                     Expanded(
                       child: RefreshIndicator(
+                        color: Hud.red,
                         onRefresh: () async => reload(),
                         child: ListView(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                           children: [
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    'CHI TIẾT KIỆN HÀNG',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: .3,
+                                    ),
+                                  ),
+                                ),
+                                StatusPill(
+                                  '${items.length.toString().padLeft(2, '0')} mặt hàng',
+                                  color: Hud.red,
+                                  dot: false,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
                             for (final line in items)
                               _CartLineCard(
                                 line: line,
@@ -145,6 +175,12 @@ class _CartScreenState extends State<CartScreen> {
                                 onChange: (quantity) => change(line, quantity),
                                 onRemove: () => remove(line),
                               ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Chạm vào một kiện hàng để xem chi tiết mới nhất từ máy chủ.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Hud.muted, fontSize: 12),
+                            ),
                           ],
                         ),
                       ),
@@ -162,6 +198,56 @@ class _CartScreenState extends State<CartScreen> {
   }
 }
 
+// Dải trạng thái trên cùng: "PAYLOAD MANIFEST" + số kiện.
+class _ManifestBar extends StatelessWidget {
+  const _ManifestBar({required this.lines});
+  final int lines;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    color: const Color(0xFFE1E8FD),
+    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+    child: Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: const BoxDecoration(
+            color: Hud.red,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Expanded(
+          child: HudLabel('Payload manifest // cargo check', color: Hud.red),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.inventory_2_outlined, size: 14, color: Hud.red),
+              const SizedBox(width: 4),
+              Text(
+                '$lines KIỆN',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _CartLineCard extends StatelessWidget {
   const _CartLineCard({
     required this.line,
@@ -176,135 +262,115 @@ class _CartLineCard extends StatelessWidget {
   final VoidCallback onView, onRemove;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
-    return Card(
-      key: ValueKey('cart-item-${line.id}'),
-      child: InkWell(
-        onTap: busy ? null : onView,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-          child: Column(
-            spacing: 8,
-            children: [
-              // Hàng trên: ảnh + thông tin + nút xóa.
-              Row(
+  Widget build(BuildContext context) => HudCard(
+    key: ValueKey('cart-item-${line.id}'),
+    onTap: busy ? null : onView,
+    padding: const EdgeInsets.all(12),
+    child: Column(
+      spacing: 10,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 12,
+          children: [
+            const ProductArt(size: 88),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 12,
+                spacing: 4,
                 children: [
-                  const ProductArt(size: 64),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      spacing: 2,
-                      children: [
-                        Text(
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
                           line.productName,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        Text(
-                          'SKU ${line.sku}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: muted,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14.5,
+                            color: Hud.ink,
+                            height: 1.25,
                           ),
                         ),
-                        Text(
-                          'Đơn giá ${money(line.unitPriceVnd)}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: muted,
-                          ),
+                      ),
+                      SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: IconButton(
+                          tooltip: 'Xóa khỏi giỏ',
+                          padding: EdgeInsets.zero,
+                          onPressed: busy ? null : onRemove,
+                          color: Hud.muted,
+                          icon: const Icon(Icons.delete_outline, size: 20),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    tooltip: 'Xóa khỏi giỏ',
-                    onPressed: busy ? null : onRemove,
-                    color: theme.colorScheme.error,
-                    icon: const Icon(Icons.delete_outline),
+                  SpecBadge('SKU: ${line.sku}'),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Đơn giá ${money(line.unitPriceVnd)}',
+                    style: const TextStyle(color: Hud.muted, fontSize: 12),
                   ),
                 ],
               ),
-              // Hàng dưới trải hết chiều ngang: số lượng | thành tiền.
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Row(
-                  spacing: 12,
-                  children: [
-                    _QuantityStepper(
-                      quantity: line.quantity,
-                      onMinus: !busy && line.quantity > 1
-                          ? () => onChange(line.quantity - 1)
-                          : null,
-                      onPlus: !busy && line.quantity < 99
-                          ? () => onChange(line.quantity + 1)
-                          : null,
-                    ),
-                    Expanded(
-                      child: Text(
-                        money(line.totalVnd),
-                        textAlign: TextAlign.end,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
+            ),
+          ],
+        ),
+        Row(
+          spacing: 12,
+          children: [
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  money(line.totalVnd),
+                  style: const TextStyle(
+                    color: Hud.red,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
+            ),
+            QtyStepper(
+              value: line.quantity,
+              onMinus: !busy && line.quantity > 1
+                  ? () => onChange(line.quantity - 1)
+                  : null,
+              onPlus: !busy && line.quantity < 99
+                  ? () => onChange(line.quantity + 1)
+                  : null,
+            ),
+          ],
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F3FF),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.info_outline, size: 15, color: Hud.blue),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Xem chi tiết kiện hàng',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Hud.blue,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right, size: 18, color: Hud.blue),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// Bộ tăng/giảm số lượng dạng viên thuốc: [-] 2 [+].
-class _QuantityStepper extends StatelessWidget {
-  const _QuantityStepper({
-    required this.quantity,
-    required this.onMinus,
-    required this.onPlus,
-  });
-  final int quantity;
-  final VoidCallback? onMinus, onPlus;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          tooltip: 'Giảm',
-          visualDensity: VisualDensity.compact,
-          iconSize: 18,
-          onPressed: onMinus,
-          icon: const Icon(Icons.remove),
-        ),
-        SizedBox(
-          width: 28,
-          child: Text(
-            '$quantity',
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ),
-        IconButton(
-          tooltip: 'Tăng',
-          visualDensity: VisualDensity.compact,
-          iconSize: 18,
-          onPressed: onPlus,
-          icon: const Icon(Icons.add),
         ),
       ],
     ),
@@ -322,89 +388,71 @@ class _CheckoutBar extends StatelessWidget {
   final VoidCallback? onCheckout;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surface,
-      elevation: 8,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Row(
+  Widget build(BuildContext context) => StickyBar(
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Tạm tính ($count sản phẩm)',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    Text(
-                      money(subtotal),
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+              Text(
+                'Tạm tính ($count sản phẩm)',
+                style: const TextStyle(
+                  color: Hud.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              FilledButton.icon(
-                onPressed: onCheckout,
-                iconAlignment: IconAlignment.end,
-                icon: const Icon(Icons.arrow_forward),
-                label: const Text('Đặt hàng'),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  money(subtotal),
+                  style: const TextStyle(
+                    color: Hud.red,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
+        const SizedBox(width: 12),
+        FilledButton.icon(
+          onPressed: onCheckout,
+          iconAlignment: IconAlignment.end,
+          icon: const Icon(Icons.arrow_forward),
+          label: const Text('Đặt hàng'),
+        ),
+      ],
+    ),
+  );
 }
 
 // Trạng thái chưa đăng nhập / giỏ trống.
 class _Placeholder extends StatelessWidget {
-  const _Placeholder({required this.message, this.hint, this.action});
+  const _Placeholder({
+    required this.message,
+    this.hint,
+    this.action,
+    this.icon = Icons.shopping_cart_outlined,
+  });
   final String message;
   final String? hint;
   final Widget? action;
+  final IconData icon;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          spacing: 12,
-          children: [
-            Icon(
-              Icons.shopping_cart_outlined,
-              size: 64,
-              color: theme.colorScheme.primary.withValues(alpha: .5),
-            ),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleMedium,
-            ),
-            if (hint != null)
-              Text(
-                hint!,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ?action, // Chỉ thêm nút khi action khác null.
-          ],
-        ),
+  Widget build(BuildContext context) => Center(
+    child: SingleChildScrollView(
+      child: EmptyState(
+        icon: icon,
+        title: message,
+        message: hint,
+        actions: [?action],
       ),
-    );
-  }
+    ),
+  );
 }

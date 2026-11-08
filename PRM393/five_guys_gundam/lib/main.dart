@@ -6,6 +6,7 @@ import 'core/api_client.dart';
 import 'core/session.dart';
 import 'core/shop_repository.dart';
 import 'screens/shell.dart';
+import 'widgets/hud.dart';
 
 void main() {
   const configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
@@ -36,20 +37,7 @@ class GundamApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: 'FiveGuysGundam',
     debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFDC2626)),
-      scaffoldBackgroundColor: const Color(0xFFF7F7F8),
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
-        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      ),
-      cardTheme: CardThemeData(
-        elevation: 0,
-        color: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      ),
-    ),
+    theme: Hud.theme(),
     home: const ShopShell(),
   );
 }

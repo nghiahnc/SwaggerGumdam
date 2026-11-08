@@ -99,140 +99,144 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Xác nhận đặt hàng')),
-      body: AsyncPanel<List<Address>>(
-        future: future,
-        onRetry: reload,
-        builder: (addresses) {
-          addressId ??=
-              addresses.where((a) => a.isDefault).firstOrNull?.id ??
-              addresses.firstOrNull?.id;
-          return Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    _Section(
-                      icon: Icons.location_on_outlined,
-                      title: 'Địa chỉ giao hàng',
-                      trailing: TextButton(
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const HudTitle('Xác nhận đặt hàng', tag: 'Launch sequence'),
+    ),
+    body: AsyncPanel<List<Address>>(
+      future: future,
+      onRetry: reload,
+      builder: (addresses) {
+        addressId ??=
+            addresses.where((a) => a.isDefault).firstOrNull?.id ??
+            addresses.firstOrNull?.id;
+        return Column(
+          children: [
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                children: [
+                  SectionHeader(
+                    'Địa chỉ giao hàng',
+                    number: 1,
+                    trailing: TextButton(
+                      onPressed: manageAddresses,
+                      child: const Text('Quản lý địa chỉ'),
+                    ),
+                  ),
+                  if (addresses.isEmpty)
+                    InfoBanner(
+                      tone: Tone.warning,
+                      tag: 'Thiếu tọa độ giao hàng',
+                      message: 'Bạn cần thêm địa chỉ trước khi đặt hàng.',
+                      action: OutlinedButton.icon(
                         onPressed: manageAddresses,
-                        child: const Text('Quản lý địa chỉ'),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Thêm địa chỉ'),
                       ),
-                      children: [
-                        if (addresses.isEmpty)
-                          _Notice(
-                            text: 'Bạn cần thêm địa chỉ trước khi đặt hàng.',
-                            action: OutlinedButton.icon(
-                              onPressed: manageAddresses,
-                              icon: const Icon(Icons.add),
-                              label: const Text('Thêm địa chỉ'),
-                            ),
-                          ),
-                        for (final address in addresses)
-                          _AddressOption(
-                            address: address,
-                            selected: addressId == address.id,
-                            onTap: () => setState(() => addressId = address.id),
-                          ),
-                      ],
                     ),
-                    _Section(
-                      icon: Icons.local_offer_outlined,
-                      title: 'Mã giảm giá',
-                      children: [
-                        Form(
-                          key: formKey,
-                          autovalidateMode: AutovalidateMode.onUserInteraction,
-                          child: TextFormField(
-                            controller: voucher,
-                            textCapitalization: TextCapitalization.characters,
-                            validator: validateVoucherCode,
-                            decoration: const InputDecoration(
-                              labelText: 'Mã voucher (nếu có)',
-                              helperText: 'API sẽ kiểm tra điều kiện voucher khi tạo đơn.',
-                              helperMaxLines: 2,
-                            ),
-                          ),
-                        ),
-                      ],
+                  for (final address in addresses)
+                    _AddressOption(
+                      address: address,
+                      selected: addressId == address.id,
+                      onTap: () => setState(() => addressId = address.id),
                     ),
-                    _Section(
-                      icon: Icons.receipt_outlined,
-                      title: 'Tóm tắt',
-                      children: [
-                        Row(
-                          spacing: 12,
-                          children: [
-                            const Text('Tạm tính'),
-                            Expanded(
-                              child: Text(
-                                money(widget.subtotalVnd),
-                                textAlign: TextAlign.end,
-                              ),
-                            ),
-                          ],
+                  const SectionHeader('Mã giảm giá', number: 2, tag: 'Voucher'),
+                  HudCard(
+                    margin: EdgeInsets.zero,
+                    child: Form(
+                      key: formKey,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      child: TextFormField(
+                        controller: voucher,
+                        textCapitalization: TextCapitalization.characters,
+                        validator: validateVoucherCode,
+                        decoration: const InputDecoration(
+                          labelText: 'Mã voucher (nếu có)',
+                          prefixIcon: Icon(Icons.local_offer_outlined),
+                          helperText:
+                              'API sẽ kiểm tra điều kiện voucher khi tạo đơn.',
+                          helperMaxLines: 2,
                         ),
-                        Text(
-                          'Giảm giá (nếu có) và giá cuối cùng được API xác nhận khi đặt hàng.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ],
-                ),
-              ),
-              Material(
-                color: theme.colorScheme.surface,
-                elevation: 8,
-                child: SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
+                  ),
+                  const SectionHeader('Tóm tắt', number: 3, tag: 'Summary'),
+                  HudCard(
+                    margin: EdgeInsets.zero,
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      spacing: 12,
                       children: [
-                        if (lastError != null) _ErrorBox(lastError!),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48),
-                          ),
-                          onPressed: busy || addresses.isEmpty ? null : submit,
-                          child: busy
-                              ? const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SizedBox.square(
-                                      dimension: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    ),
-                                    SizedBox(width: 12),
-                                    Text('Đang tạo đơn...'),
-                                  ],
-                                )
-                              : const Text('Tạo đơn hàng'),
+                        MoneyRow('Tạm tính', money(widget.subtotalVnd)),
+                        const Divider(height: 20),
+                        const Text(
+                          'Giảm giá (nếu có) và giá cuối cùng được API xác nhận khi đặt hàng.',
+                          style: TextStyle(color: Hud.muted, fontSize: 12.5),
                         ),
                       ],
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          );
-        },
-      ),
-    );
-  }
+            ),
+            StickyBar(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: 10,
+                children: [
+                  if (lastError != null) _ErrorBox(lastError!),
+                  Row(
+                    children: [
+                      const HudLabel('Tạm tính đơn'),
+                      const Spacer(),
+                      Flexible(
+                        flex: 3,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            money(widget.subtotalVnd),
+                            style: const TextStyle(
+                              color: Hud.red,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                    ),
+                    onPressed: busy || addresses.isEmpty ? null : submit,
+                    child: busy
+                        ? const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox.square(
+                                dimension: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              Text('Đang tạo đơn...'),
+                            ],
+                          )
+                        : const Text('Tạo đơn hàng'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }
 
 // Hộp lỗi đỏ nằm cố định trên nút "Tạo đơn hàng" (SnackBar tự ẩn và che nút).
@@ -241,74 +245,32 @@ class _ErrorBox extends StatelessWidget {
   final String message;
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        spacing: 8,
-        children: [
-          Icon(Icons.error_outline, color: scheme.onErrorContainer),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(color: scheme.onErrorContainer),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Hud.redSoft,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Hud.red.withValues(alpha: .3)),
+    ),
+    child: Row(
+      spacing: 8,
+      children: [
+        const Icon(Icons.error_outline, color: Hud.redDark),
+        Expanded(
+          child: Text(
+            message,
+            style: const TextStyle(
+              color: Hud.redDark,
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-// Khối thẻ có icon + tiêu đề + nút phụ bên phải (tùy chọn).
-class _Section extends StatelessWidget {
-  const _Section({
-    required this.icon,
-    required this.title,
-    required this.children,
-    this.trailing,
-  });
-  final IconData icon;
-  final String title;
-  final Widget? trailing;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 12,
-          children: [
-            Row(
-              spacing: 8,
-              children: [
-                Icon(icon, size: 20, color: theme.colorScheme.primary),
-                Expanded(
-                  child: Text(title, style: theme.textTheme.titleMedium),
-                ),
-                // Chỉ thêm khi có nút phụ; Flexible để màn hẹp không bị tràn.
-                if (trailing case final action?) Flexible(child: action),
-              ],
-            ),
-            ...children,
-          ],
         ),
-      ),
-    );
-  }
+      ],
+    ),
+  );
 }
 
-// Một địa chỉ có thể chọn; viền màu chủ đạo khi đang được chọn.
+// Một địa chỉ có thể chọn; viền đỏ khi đang được chọn.
 class _AddressOption extends StatelessWidget {
   const _AddressOption({
     required this.address,
@@ -320,64 +282,46 @@ class _AddressOption extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: selected ? scheme.primaryContainer.withValues(alpha: .35) : null,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: selected ? scheme.primary : scheme.outlineVariant,
-          width: selected ? 1.5 : 1,
-        ),
-      ),
-      child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        onTap: onTap,
-        leading: Icon(
-          selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-          color: selected ? scheme.primary : null,
-        ),
-        title: Text(address.recipient),
-        subtitle: Text('${address.phone}\n${address.display}'),
-        trailing: address.isDefault
-            ? Text('Mặc định', style: TextStyle(color: scheme.primary))
-            : null,
-      ),
-    );
-  }
-}
-
-// Hộp thông báo nhỏ kèm nút hành động.
-class _Notice extends StatelessWidget {
-  const _Notice({required this.text, required this.action});
-  final String text;
-  final Widget action;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: Colors.orange.shade50,
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Column(
+  Widget build(BuildContext context) => HudCard(
+    onTap: onTap,
+    borderColor: selected ? Hud.red : Hud.line,
+    color: selected ? const Color(0xFFFFF5F5) : Colors.white,
+    padding: const EdgeInsets.all(14),
+    child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 8,
       children: [
-        Row(
-          spacing: 8,
-          children: [
-            Icon(Icons.info_outline, color: Colors.orange.shade800),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(color: Colors.orange.shade900),
-              ),
-            ),
-          ],
+        Icon(
+          selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+          color: selected ? Hud.red : Hud.muted,
         ),
-        action,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      address.recipient,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: Hud.ink,
+                      ),
+                    ),
+                  ),
+                  if (address.isDefault)
+                    const StatusPill('Mặc định', color: Hud.red),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${address.phone}\n${address.display}',
+                style: const TextStyle(color: Hud.muted, height: 1.4),
+              ),
+            ],
+          ),
+        ),
       ],
     ),
   );

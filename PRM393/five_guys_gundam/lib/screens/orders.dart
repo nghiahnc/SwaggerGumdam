@@ -41,54 +41,38 @@ class OrderStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = orderStatusColor(status);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.shade50,
-        border: Border.all(color: color.shade200),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        orderStatusLabel(status),
-        style: TextStyle(
-          color: color.shade800,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+    return StatusPill(
+      orderStatusLabel(status),
+      color: color.shade700,
+      background: color.shade50,
     );
   }
 }
 
 // Màn hình trống/chưa đăng nhập: icon + thông điệp + nút (nếu có).
 class _Placeholder extends StatelessWidget {
-  const _Placeholder({required this.icon, required this.message, this.action});
+  const _Placeholder({
+    required this.icon,
+    required this.message,
+    this.hint,
+    this.action,
+  });
   final IconData icon;
   final String message;
+  final String? hint;
   final Widget? action;
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          spacing: 16,
-          children: [
-            Icon(icon, size: 64, color: scheme.primary.withValues(alpha: .5)),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            ?action, // Chỉ thêm nút khi action khác null.
-          ],
-        ),
+  Widget build(BuildContext context) => Center(
+    child: SingleChildScrollView(
+      child: EmptyState(
+        icon: icon,
+        title: message,
+        message: hint,
+        actions: [?action],
       ),
-    );
-  }
+    ),
+  );
 }
 
 class OrdersScreen extends StatefulWidget {
@@ -126,12 +110,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Widget build(BuildContext context) {
     final session = context.watch<SessionController>();
     return Scaffold(
-      appBar: AppBar(title: const Text('Đơn hàng')),
+      appBar: AppBar(
+        title: const HudTitle('Đơn hàng', tag: 'System // Order log'),
+      ),
       body: !session.isSignedIn
           ? _Placeholder(
               icon: Icons.receipt_long_outlined,
               message: 'Đăng nhập để theo dõi đơn hàng của bạn.',
-              action: FilledButton(
+              hint: 'Lịch sử đơn, thanh toán và vận chuyển nằm ở đây.',
+              action: FilledButton.icon(
                 onPressed: () async {
                   await Navigator.push(
                     context,
@@ -139,7 +126,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   );
                   if (mounted) reload();
                 },
-                child: const Text('Đăng nhập để xem đơn'),
+                icon: const Icon(Icons.login),
+                label: const Text('Đăng nhập để xem đơn'),
               ),
             )
           : AsyncPanel<List<ShopOrder>>(
@@ -151,15 +139,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   return const _Placeholder(
                     icon: Icons.receipt_long_outlined,
                     message: 'Chưa có đơn hàng.',
+                    hint: 'Đơn bạn tạo từ giỏ hàng sẽ xuất hiện ở đây.',
                   );
                 }
                 final shown = session.isAdmin && onlyActionable
                     ? items.where((o) => nextAdminStatus(o.status) != null)
                     : items;
                 return RefreshIndicator(
+                  color: Hud.red,
                   onRefresh: () async => reload(),
                   child: ListView(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                     children: [
                       if (session.isAdmin)
                         Padding(
@@ -183,14 +173,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           ),
                         ),
                       if (shown.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            items.isEmpty
-                                ? 'Không còn đơn ở trang này.'
-                                : 'Không có đơn cần xử lý ở trang này.',
-                            textAlign: TextAlign.center,
-                          ),
+                        EmptyState(
+                          icon: Icons.inbox_outlined,
+                          title: items.isEmpty
+                              ? 'Không còn đơn ở trang này.'
+                              : 'Không có đơn cần xử lý ở trang này.',
                         ),
                       for (final order in shown)
                         _OrderCard(
@@ -198,32 +185,45 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           onTap: () => openDetail(order),
                         ),
                       if (page > 1 || items.length >= 20)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            TextButton.icon(
-                              onPressed: page == 1
-                                  ? null
-                                  : () {
-                                      page--;
-                                      reload();
-                                    },
-                              icon: const Icon(Icons.chevron_left),
-                              label: const Text('Trang trước'),
-                            ),
-                            Text('Trang $page'),
-                            TextButton.icon(
-                              onPressed: items.length < 20
-                                  ? null
-                                  : () {
-                                      page++;
-                                      reload();
-                                    },
-                              iconAlignment: IconAlignment.end,
-                              icon: const Icon(Icons.chevron_right),
-                              label: const Text('Trang sau'),
-                            ),
-                          ],
+                        HudCard(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
+                          child: Row(
+                            children: [
+                              TextButton.icon(
+                                onPressed: page == 1
+                                    ? null
+                                    : () {
+                                        page--;
+                                        reload();
+                                      },
+                                icon: const Icon(Icons.chevron_left),
+                                label: const Text('Trang trước'),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  'Trang $page',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: items.length < 20
+                                    ? null
+                                    : () {
+                                        page++;
+                                        reload();
+                                      },
+                                iconAlignment: IconAlignment.end,
+                                icon: const Icon(Icons.chevron_right),
+                                label: const Text('Trang sau'),
+                              ),
+                            ],
+                          ),
                         ),
                     ],
                   ),
@@ -241,60 +241,84 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
     final first = order.items.firstOrNull?.productName ?? '';
     final more = order.items.length > 1
         ? ' và ${order.items.length - 1} sản phẩm khác'
         : '';
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: 6,
+    final color = orderStatusColor(order.status);
+    return HudCard(
+      onTap: onTap,
+      accent: color.shade400,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 8,
+        children: [
+          Row(
+            spacing: 8,
             children: [
-              Row(
-                spacing: 8,
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Đơn ${shortOrderId(order.id)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+              Expanded(
+                child: Text(
+                  'Đơn ${shortOrderId(order.id)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamilyFallback: Hud.mono,
+                    fontWeight: FontWeight.w800,
+                    color: Hud.ink,
                   ),
-                  OrderStatusChip(order.status),
-                ],
+                ),
               ),
-              Text('$first$more', maxLines: 1, overflow: TextOverflow.ellipsis),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
+              OrderStatusChip(order.status),
+            ],
+          ),
+          Row(
+            spacing: 12,
+            children: [
+              const ProductArt(size: 52),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 4,
+                  children: [
+                    Text(
+                      '$first$more',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    Text(
                       '${formatDateTime(order.createdAtUtc)} · ${itemCount(order)} sản phẩm',
-                      style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                      style: const TextStyle(color: Hud.muted, fontSize: 12.5),
                     ),
-                  ),
-                  Text(
-                    money(order.totalVnd),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Icon(Icons.chevron_right, color: muted),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
-        ),
+          const Divider(height: 4),
+          Row(
+            children: [
+              const HudLabel('Tổng thanh toán'),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    money(order.totalVnd),
+                    style: const TextStyle(
+                      color: Hud.red,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Hud.muted),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -370,9 +394,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Widget build(BuildContext context) {
     final session = context.watch<SessionController>();
     final isAdmin = session.isAdmin;
-    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Chi tiết đơn hàng')),
+      appBar: AppBar(
+        title: const HudTitle('Chi tiết đơn hàng', tag: 'System navigation'),
+      ),
       body: AsyncPanel<ShopOrder>(
         future: future,
         onRetry: reload,
@@ -383,159 +408,252 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           // Backend cũ không trả userId thì giữ hành vi cũ.
           final isOwner =
               order.userId == null || order.userId == session.user?.id;
-          return RefreshIndicator(
-            onRefresh: () async => reload(),
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (busy) const LinearProgressIndicator(minHeight: 2),
-                _Section(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Đơn ${shortOrderId(order.id)}',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        OrderStatusChip(order.status),
-                      ],
-                    ),
-                    _InfoRow(
-                      icon: Icons.payments_outlined,
-                      label: 'Thanh toán',
-                      value: paymentStatusLabel(order.paymentStatus),
-                    ),
-                    _InfoRow(
-                      icon: Icons.schedule,
-                      label: 'Tạo lúc',
-                      value: formatDateTime(order.createdAtUtc),
-                    ),
-                    if (order.status == 'PendingPayment')
-                      _InfoRow(
-                        icon: Icons.timer_outlined,
-                        label: 'Hạn thanh toán',
-                        value: formatDateTime(order.expiresAtUtc),
-                      ),
-                    if (hint != null)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: color.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          spacing: 10,
+          final next = isAdmin ? nextAdminStatus(order.status) : null;
+          final canPay = order.status == 'PendingPayment' && isOwner;
+          final canCancel = canCancelOrder(order.status);
+          return Column(
+            children: [
+              if (busy)
+                const LinearProgressIndicator(minHeight: 2, color: Hud.red),
+              Expanded(
+                child: RefreshIndicator(
+                  color: Hud.red,
+                  onRefresh: () async => reload(),
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    children: [
+                      NavyPanel(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          spacing: 6,
                           children: [
-                            Icon(Icons.info_outline, color: color.shade700),
-                            Expanded(
-                              child: Text(
-                                hint,
-                                style: TextStyle(color: color.shade900),
-                              ),
+                            const HudLabel('Mã đơn', color: Color(0xFFF87171)),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Đơn ${shortOrderId(order.id)}',
+                                    style: const TextStyle(
+                                      fontFamilyFallback: Hud.mono,
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                                OrderStatusChip(order.status),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            _InfoRow(
+                              icon: Icons.payments_outlined,
+                              label: 'Thanh toán',
+                              value: paymentStatusLabel(order.paymentStatus),
+                              dark: true,
+                            ),
+                            _InfoRow(
+                              icon: Icons.schedule,
+                              label: 'Tạo lúc',
+                              value: formatDateTime(order.createdAtUtc),
+                              dark: true,
                             ),
                           ],
                         ),
                       ),
-                  ],
-                ),
-                _Section(
-                  title: 'Sản phẩm (${itemCount(order)})',
-                  children: [
-                    for (final item in order.items)
-                      Row(
-                        spacing: 12,
-                        children: [
-                          const ProductArt(size: 48),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.productName,
-                                  style: theme.textTheme.titleSmall,
-                                ),
-                                Text(
-                                  '${item.sku}\n${money(item.unitPriceVnd)} × ${item.quantity}',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
+                      if (hint != null) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: color.shade50,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: color.shade200),
+                          ),
+                          child: Row(
+                            spacing: 10,
+                            children: [
+                              Icon(Icons.info_outline, color: color.shade700),
+                              Expanded(
+                                child: Text(
+                                  hint,
+                                  style: TextStyle(
+                                    color: color.shade900,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                              ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (order.status == 'PendingPayment')
+                        HudCard(
+                          margin: const EdgeInsets.only(top: 10),
+                          color: Hud.navy,
+                          borderColor: Hud.navy,
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.timer_outlined,
+                                color: Color(0xFFF87171),
+                              ),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Text(
+                                  'Hạn thanh toán',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                formatDateTime(order.expiresAtUtc),
+                                style: const TextStyle(
+                                  fontFamilyFallback: Hud.mono,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SectionHeader(
+                        'Trình tự vận hành',
+                        tag: 'Phase log',
+                      ),
+                      HudCard(
+                        margin: EdgeInsets.zero,
+                        child: _Timeline(status: order.status),
+                      ),
+                      SectionHeader(
+                        'Sản phẩm (${itemCount(order)})',
+                        tag: 'Payload',
+                      ),
+                      HudCard(
+                        margin: EdgeInsets.zero,
+                        child: Column(
+                          spacing: 12,
+                          children: [
+                            for (final item in order.items)
+                              Row(
+                                spacing: 12,
+                                children: [
+                                  const ProductArt(size: 52),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item.productName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${item.sku}\n${money(item.unitPriceVnd)} × ${item.quantity}',
+                                          style: const TextStyle(
+                                            color: Hud.muted,
+                                            fontSize: 12.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Text(
+                                    money(item.unitPriceVnd * item.quantity),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SectionHeader('Thanh toán', tag: 'Billing'),
+                      HudCard(
+                        margin: EdgeInsets.zero,
+                        child: Column(
+                          children: [
+                            MoneyRow('Tạm tính', money(order.subtotalVnd)),
+                            MoneyRow(
+                              'Giảm giá',
+                              order.discountVnd > 0
+                                  ? '-${money(order.discountVnd)}'
+                                  : money(0),
+                              valueColor: order.discountVnd > 0
+                                  ? Hud.green
+                                  : null,
+                            ),
+                            const Divider(height: 16),
+                            MoneyRow(
+                              'Tổng cộng',
+                              money(order.totalVnd),
+                              valueColor: Hud.red,
+                              bold: true,
+                              big: true,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (canPay || canCancel || next != null)
+                StickyBar(
+                  child: Row(
+                    spacing: 10,
+                    children: [
+                      if (canCancel)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: busy ? null : cancel,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Hud.redDark,
+                              side: BorderSide(
+                                color: Hud.red.withValues(alpha: .4),
+                              ),
+                            ),
+                            icon: const Icon(Icons.close),
+                            label: const Text('Hủy đơn'),
+                          ),
+                        ),
+                      if (canPay)
+                        Expanded(
+                          flex: 2,
+                          child: FilledButton.icon(
+                            onPressed: busy ? null : () => pay(order),
+                            icon: const Icon(Icons.payment),
+                            label: const Text('Thanh toán'),
+                          ),
+                        ),
+                      if (next != null)
+                        Expanded(
+                          child: FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Hud.navy,
+                            ),
+                            onPressed: busy ? null : () => advance(next),
+                            icon: Icon(
+                              next == 'Shipped'
+                                  ? Icons.local_shipping_outlined
+                                  : Icons.check_circle_outline,
+                            ),
+                            label: Text(
+                              next == 'Shipped'
+                                  ? 'Xác nhận đã gửi hàng'
+                                  : 'Xác nhận đã giao hàng',
                             ),
                           ),
-                          Text(money(item.unitPriceVnd * item.quantity)),
-                        ],
-                      ),
-                  ],
-                ),
-                _Section(
-                  title: 'Thanh toán',
-                  children: [
-                    _AmountRow('Tạm tính', money(order.subtotalVnd)),
-                    _AmountRow(
-                      'Giảm giá',
-                      order.discountVnd > 0
-                          ? '-${money(order.discountVnd)}'
-                          : money(0),
-                      valueStyle: order.discountVnd > 0
-                          ? TextStyle(color: Colors.green.shade700)
-                          : null,
-                    ),
-                    const Divider(height: 8),
-                    _AmountRow(
-                      'Tổng cộng',
-                      money(order.totalVnd),
-                      labelStyle: theme.textTheme.titleMedium,
-                      valueStyle: theme.textTheme.titleLarge?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  spacing: 8,
-                  children: [
-                    if (order.status == 'PendingPayment' && isOwner)
-                      FilledButton.icon(
-                        onPressed: busy ? null : () => pay(order),
-                        icon: const Icon(Icons.payment),
-                        label: const Text('Thanh toán'),
-                      ),
-                    if (canCancelOrder(order.status))
-                      OutlinedButton.icon(
-                        onPressed: busy ? null : cancel,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: theme.colorScheme.error,
                         ),
-                        icon: const Icon(Icons.close),
-                        label: const Text('Hủy đơn'),
-                      ),
-                    if (nextAdminStatus(order.status) case final next?
-                        when isAdmin)
-                      FilledButton.icon(
-                        onPressed: busy ? null : () => advance(next),
-                        icon: Icon(
-                          next == 'Shipped'
-                              ? Icons.local_shipping_outlined
-                              : Icons.check_circle_outline,
-                        ),
-                        label: Text(
-                          next == 'Shipped'
-                              ? 'Xác nhận đã gửi hàng'
-                              : 'Xác nhận đã giao hàng',
-                        ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ],
-            ),
+            ],
           );
         },
       ),
@@ -543,28 +661,98 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 }
 
-// Khối nội dung dạng thẻ trắng, có tiêu đề tùy chọn.
-class _Section extends StatelessWidget {
-  const _Section({required this.children, this.title});
-  final String? title;
-  final List<Widget> children;
+/// Bốn bước của một đơn: tạo → trả tiền → gửi → nhận. Đơn đóng giữa chừng
+/// (hủy, hết hạn, thanh toán lỗi) dừng ở bước đầu và được đánh dấu đỏ.
+class _Timeline extends StatelessWidget {
+  const _Timeline({required this.status});
+  final String status;
+
+  static const _steps = [
+    ('Tạo đơn, giữ tồn kho', Icons.inventory_2_outlined),
+    ('Xác nhận tiền về', Icons.payments_outlined),
+    ('Bàn giao vận chuyển', Icons.local_shipping_outlined),
+    ('Khách đã nhận hàng', Icons.verified_outlined),
+  ];
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 12),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 10,
-        children: [
-          if (title != null)
-            Text(title!, style: Theme.of(context).textTheme.titleMedium),
-          ...children,
-        ],
-      ),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final reached = switch (status) {
+      'PendingPayment' => 0,
+      'Paid' => 1,
+      'Shipped' => 2,
+      'Delivered' => 3,
+      _ => 0,
+    };
+    final closed = const {
+      'Cancelled',
+      'Expired',
+      'PaymentFailed',
+    }.contains(status);
+    return Column(
+      children: [
+        for (var i = 0; i < _steps.length; i++)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Column(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: i <= reached
+                          ? (closed && i == 0 ? Hud.redSoft : Hud.greenSoft)
+                          : const Color(0xFFF1F5F9),
+                      border: Border.all(
+                        color: i == reached && !closed
+                            ? Hud.red
+                            : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                    child: Icon(
+                      closed && i == 0
+                          ? Icons.block
+                          : i < reached || (i == 3 && reached == 3)
+                          ? Icons.check
+                          : _steps[i].$2,
+                      size: 15,
+                      color: i <= reached
+                          ? (closed && i == 0 ? Hud.redDark : Hud.green)
+                          : Hud.muted,
+                    ),
+                  ),
+                  if (i < _steps.length - 1)
+                    Container(
+                      width: 2,
+                      height: 22,
+                      color: i < reached && !closed ? Hud.green : Hud.line,
+                    ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 5),
+                  child: Text(
+                    closed && i == 0
+                        ? 'Đơn đã đóng: ${orderStatusLabel(status).toLowerCase()}'
+                        : _steps[i].$1,
+                    style: TextStyle(
+                      fontWeight: i == reached
+                          ? FontWeight.w800
+                          : FontWeight.w500,
+                      color: i <= reached ? Hud.ink : Hud.muted,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
 }
 
 class _InfoRow extends StatelessWidget {
@@ -572,13 +760,15 @@ class _InfoRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.dark = false,
   });
   final IconData icon;
   final String label, value;
+  final bool dark;
 
   @override
   Widget build(BuildContext context) {
-    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final muted = dark ? Colors.white60 : Hud.muted;
     return Row(
       spacing: 8,
       children: [
@@ -588,27 +778,13 @@ class _InfoRow extends StatelessWidget {
           child: Text(
             value,
             textAlign: TextAlign.end,
-            style: const TextStyle(fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: dark ? Colors.white : Hud.ink,
+            ),
           ),
         ),
       ],
     );
   }
-}
-
-class _AmountRow extends StatelessWidget {
-  const _AmountRow(this.label, this.value, {this.labelStyle, this.valueStyle});
-  final String label, value;
-  final TextStyle? labelStyle, valueStyle;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    spacing: 12,
-    children: [
-      Text(label, style: labelStyle),
-      Expanded(
-        child: Text(value, textAlign: TextAlign.end, style: valueStyle),
-      ),
-    ],
-  );
 }

@@ -55,10 +55,12 @@ class _AddressesScreenState extends State<AddressesScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Địa chỉ giao hàng')),
+    appBar: AppBar(
+      title: const HudTitle('Địa chỉ giao hàng', tag: 'Delivery coordinates'),
+    ),
     floatingActionButton: FloatingActionButton.extended(
       onPressed: edit,
-      icon: const Icon(Icons.add),
+      icon: const Icon(Icons.add_location_alt_outlined),
       label: const Text('Thêm địa chỉ'),
     ),
     body: AsyncPanel<List<Address>>(
@@ -67,27 +69,65 @@ class _AddressesScreenState extends State<AddressesScreen> {
       isEmpty: (items) => items.isEmpty,
       emptyMessage: 'Chưa có địa chỉ. Hãy thêm trước khi đặt hàng.',
       builder: (items) => RefreshIndicator(
+        color: Hud.red,
         onRefresh: () async => reload(),
         child: ListView.builder(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
           itemCount: items.length,
           itemBuilder: (context, index) {
             final a = items[index];
-            return Card(
-              child: ListTile(
-                title: Text('${a.recipient} · ${a.phone}'),
-                subtitle: Text(
-                  '${a.display}${a.isDefault ? '\nMặc định' : ''}',
-                ),
-                isThreeLine: a.isDefault,
-                trailing: PopupMenuButton<String>(
-                  onSelected: (choice) =>
-                      choice == 'edit' ? edit(a) : remove(a),
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'edit', child: Text('Sửa')),
-                    PopupMenuItem(value: 'delete', child: Text('Xóa')),
-                  ],
-                ),
+            return HudCard(
+              accent: a.isDefault ? Hud.red : null,
+              padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: a.isDefault
+                          ? Hud.redSoft
+                          : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.location_on_outlined,
+                      color: a.isDefault ? Hud.red : Hud.muted,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      spacing: 4,
+                      children: [
+                        Text(
+                          '${a.recipient} · ${a.phone}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: Hud.ink,
+                          ),
+                        ),
+                        Text(
+                          a.display,
+                          style: const TextStyle(color: Hud.muted, height: 1.4),
+                        ),
+                        if (a.isDefault)
+                          const StatusPill('Mặc định', color: Hud.red),
+                      ],
+                    ),
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Thao tác',
+                    onSelected: (choice) =>
+                        choice == 'edit' ? edit(a) : remove(a),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'edit', child: Text('Sửa')),
+                      PopupMenuItem(value: 'delete', child: Text('Xóa')),
+                    ],
+                  ),
+                ],
               ),
             );
           },
@@ -109,19 +149,29 @@ class _AddressFormDialogState extends State<AddressFormDialog> {
   final values = <String, String>{};
   late bool isDefault = widget.existing?.isDefault ?? false;
 
-  Widget field(String keyName, String label, String? initial) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: TextFormField(
-      initialValue: initial,
-      decoration: InputDecoration(labelText: label),
-      validator: requiredText,
-      onSaved: (value) => values[keyName] = value!.trim(),
-    ),
-  );
+  Widget field(String keyName, String label, String? initial, IconData icon) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: TextFormField(
+          initialValue: initial,
+          decoration: InputDecoration(
+            labelText: label,
+            prefixIcon: Icon(icon, size: 20),
+          ),
+          validator: requiredText,
+          onSaved: (value) => values[keyName] = value!.trim(),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.existing == null ? 'Thêm địa chỉ' : 'Sửa địa chỉ'),
+    title: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const HudLabel('Tactical delivery spec', color: Hud.red),
+        Text(widget.existing == null ? 'Thêm địa chỉ' : 'Sửa địa chỉ'),
+      ],
+    ),
     content: SizedBox(
       width: 420,
       child: SingleChildScrollView(
@@ -130,13 +180,44 @@ class _AddressFormDialogState extends State<AddressFormDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              field('recipient', 'Người nhận', widget.existing?.recipient),
-              field('phone', 'Điện thoại', widget.existing?.phone),
-              field('line1', 'Số nhà / đường', widget.existing?.line1),
-              field('ward', 'Phường / xã', widget.existing?.ward),
-              field('district', 'Quận / huyện', widget.existing?.district),
-              field('province', 'Tỉnh / thành phố', widget.existing?.province),
+              field(
+                'recipient',
+                'Người nhận',
+                widget.existing?.recipient,
+                Icons.person_outline,
+              ),
+              field(
+                'phone',
+                'Điện thoại',
+                widget.existing?.phone,
+                Icons.phone_outlined,
+              ),
+              field(
+                'line1',
+                'Số nhà / đường',
+                widget.existing?.line1,
+                Icons.home_outlined,
+              ),
+              field(
+                'ward',
+                'Phường / xã',
+                widget.existing?.ward,
+                Icons.map_outlined,
+              ),
+              field(
+                'district',
+                'Quận / huyện',
+                widget.existing?.district,
+                Icons.map_outlined,
+              ),
+              field(
+                'province',
+                'Tỉnh / thành phố',
+                widget.existing?.province,
+                Icons.location_city_outlined,
+              ),
               SwitchListTile(
+                contentPadding: EdgeInsets.zero,
                 title: const Text('Địa chỉ mặc định'),
                 value: isDefault,
                 onChanged: (value) => setState(() => isDefault = value),

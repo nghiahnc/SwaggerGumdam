@@ -60,37 +60,45 @@ class _AdminCatalogScreenState extends State<AdminCatalogScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Quản lý sản phẩm')),
+    appBar: AppBar(
+      title: const HudTitle('Quản lý sản phẩm', tag: 'Admin // Catalog'),
+    ),
     body: AsyncPanel<(List<Category>, List<Product>)>(
       future: future,
       onRetry: reload,
       builder: (data) {
         final (categories, products) = data;
+        final active = products.where((p) => p.isActive).length;
         return ListView(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             Row(
+              spacing: 10,
               children: [
-                Expanded(
-                  child: Text(
-                    'Sản phẩm',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                FilledButton.icon(
-                  onPressed: categories.where((c) => c.isActive).isEmpty
-                      ? null
-                      : () => editProduct(categories),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Thêm'),
-                ),
+                _Stat('Tổng mô hình', '${products.length}', Hud.blue),
+                _Stat('Mở bán', '$active', Hud.green),
+                _Stat('Danh mục', '${categories.length}', Hud.purple),
               ],
+            ),
+            SectionHeader(
+              'Sản phẩm',
+              trailing: FilledButton.icon(
+                onPressed: categories.where((c) => c.isActive).isEmpty
+                    ? null
+                    : () => editProduct(categories),
+                icon: const Icon(Icons.add),
+                label: const Text('Thêm'),
+              ),
             ),
             for (final product in products)
               Card(
                 child: ListTile(
-                  leading: ProductArt(url: product.imageUrl),
-                  title: Text(product.name),
+                  contentPadding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+                  leading: ProductArt(url: product.imageUrl, size: 52),
+                  title: Text(
+                    product.name,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
                   subtitle: Text(
                     '${product.grade} · ${product.scale} · '
                     '${product.isActive ? 'Đang bán' : 'Ngừng bán'}',
@@ -113,7 +121,32 @@ class _AdminCatalogScreenState extends State<AdminCatalogScreen> {
   );
 }
 
-/// UC22, UC23: form thêm và sửa sản phẩm.
+class _Stat extends StatelessWidget {
+  const _Stat(this.label, this.value, this.color);
+  final String label, value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: HudCard(
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HudLabel(label, color: color, size: 9),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// UC22, UC23: form thêm và sửa sản phẩm.
 class ProductDialog extends StatefulWidget {
   const ProductDialog({
     required this.categories,

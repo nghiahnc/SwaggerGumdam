@@ -89,7 +89,9 @@ class _AdminInventoryScreenState extends State<AdminInventoryScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('SKU và tồn kho')),
+    appBar: AppBar(
+      title: const HudTitle('SKU và tồn kho', tag: 'Admin // Inventory'),
+    ),
     body: AsyncPanel<(List<Product>, List<Variant>)>(
       future: future,
       onRetry: reload,
@@ -97,36 +99,88 @@ class _AdminInventoryScreenState extends State<AdminInventoryScreen> {
         final (products, variants) = data;
         final selected = products.where((p) => p.id == productId).firstOrNull;
         if (products.isEmpty) {
-          return const Center(child: Text('Thêm sản phẩm trước khi tạo SKU.'));
+          return const Center(
+            child: SingleChildScrollView(
+              child: EmptyState(
+                icon: Icons.inventory_2_outlined,
+                title: 'Thêm sản phẩm trước khi tạo SKU.',
+              ),
+            ),
+          );
         }
+        final totalStock = variants.fold<int>(0, (s, v) => s + v.stock);
+        final low = variants.where((v) => v.isActive && v.stock <= 3).length;
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-            DropdownButtonFormField<String>(
-              initialValue: productId,
-              decoration: const InputDecoration(labelText: 'Sản phẩm'),
-              items: products
-                  .map(
-                    (p) => DropdownMenuItem(value: p.id, child: Text(p.name)),
-                  )
-                  .toList(),
-              onChanged: (v) {
-                productId = v;
-                reload();
-              },
+            HudCard(
+              margin: EdgeInsets.zero,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const HudLabel('Chọn mô hình cần quản lý'),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: productId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Sản phẩm',
+                      prefixIcon: Icon(Icons.smart_toy_outlined),
+                    ),
+                    items: products
+                        .map(
+                          (p) => DropdownMenuItem(
+                            value: p.id,
+                            child: Text(
+                              p.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      productId = v;
+                      reload();
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    spacing: 8,
+                    children: [
+                      StatusPill('${variants.length} SKU', color: Hud.navySoft),
+                      StatusPill('Tổng tồn $totalStock', color: Hud.blue),
+                      if (low > 0)
+                        StatusPill('$low sắp hết', color: Hud.redDark),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: selected?.isActive == true ? edit : null,
-              icon: const Icon(Icons.add),
-              label: const Text('Thêm SKU'),
+            SectionHeader(
+              'Danh sách SKU',
+              trailing: FilledButton.icon(
+                onPressed: selected?.isActive == true ? edit : null,
+                icon: const Icon(Icons.add),
+                label: const Text('Thêm SKU'),
+              ),
             ),
-            const SizedBox(height: 12),
-            if (variants.isEmpty) const Text('Sản phẩm chưa có SKU.'),
+            if (variants.isEmpty)
+              const InfoBanner(
+                tone: Tone.warning,
+                message: 'Sản phẩm chưa có SKU.',
+              ),
             for (final variant in variants)
               Card(
                 child: ListTile(
-                  title: Text('${variant.sku} · ${variant.label}'),
+                  contentPadding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+                  leading: _StockBox(variant: variant),
+                  title: Text(
+                    '${variant.sku} · ${variant.label}',
+                    style: const TextStyle(
+                      fontFamilyFallback: Hud.mono,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                   subtitle: Text(
                     '${money(variant.priceVnd)} · '
                     'Tồn ${variant.stock} · '
@@ -159,7 +213,47 @@ class _AdminInventoryScreenState extends State<AdminInventoryScreen> {
   );
 }
 
-/// UC25, UC26: form thêm và sửa SKU. Mã SKU và tồn ban đầu chỉ nhập khi thêm.
+class _StockBox extends StatelessWidget {
+  const _StockBox({required this.variant});
+  final Variant variant;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = !variant.isActive
+        ? Hud.muted
+        : variant.stock <= 3
+        ? Hud.redDark
+        : Hud.green;
+    return Container(
+      width: 46,
+      height: 46,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: .3)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          FittedBox(
+            child: Text(
+              '${variant.stock}',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          HudLabel('Tồn', color: color, size: 8),
+        ],
+      ),
+    );
+  }
+}
+
+// UC25, UC26: form thêm và sửa SKU. Mã SKU và tồn ban đầu chỉ nhập khi thêm.
 class VariantDialog extends StatefulWidget {
   const VariantDialog({
     required this.productId,

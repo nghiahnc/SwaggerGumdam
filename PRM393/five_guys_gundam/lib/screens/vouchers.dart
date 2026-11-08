@@ -138,14 +138,13 @@ class _VouchersScreenState extends State<VouchersScreen> {
   Widget build(BuildContext context) {
     if (!context.watch<SessionController>().isAdmin) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Voucher')),
+        appBar: AppBar(title: const HudTitle('Voucher', tag: 'Admin // Promo')),
         body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'Chỉ tài khoản quản trị mới quản lý được voucher.',
+          child: SingleChildScrollView(
+            child: EmptyState(
               key: Key('vouchers-denied'),
-              textAlign: TextAlign.center,
+              icon: Icons.lock_outline,
+              title: 'Chỉ tài khoản quản trị mới quản lý được voucher.',
             ),
           ),
         ),
@@ -154,7 +153,7 @@ class _VouchersScreenState extends State<VouchersScreen> {
     final current = future;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Voucher'),
+        title: const HudTitle('Voucher', tag: 'Admin // Promo'),
         actions: [
           IconButton(
             tooltip: 'Tải lại',
@@ -165,7 +164,10 @@ class _VouchersScreenState extends State<VouchersScreen> {
         bottom: busy
             ? const PreferredSize(
                 preferredSize: Size.fromHeight(4),
-                child: LinearProgressIndicator(key: Key('vouchers-busy')),
+                child: LinearProgressIndicator(
+                  key: Key('vouchers-busy'),
+                  color: Hud.red,
+                ),
               )
             : null,
       ),
@@ -187,17 +189,16 @@ class _VouchersScreenState extends State<VouchersScreen> {
                 final now = DateTime.now();
                 return ListView(
                   // Leaves room for the floating button over the last card.
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                      child: Text(
-                        'Lượt đã dùng tính cả đơn đang chờ thanh toán. Đơn bị '
-                        'hủy, hết hạn hoặc thanh toán thất bại sẽ trả lại lượt.',
-                        key: const Key('vouchers-usage-note'),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
+                    const InfoBanner(
+                      key: Key('vouchers-usage-note'),
+                      tag: 'Quy tắc lượt dùng',
+                      message:
+                          'Lượt đã dùng tính cả đơn đang chờ thanh toán. Đơn bị '
+                          'hủy, hết hạn hoặc thanh toán thất bại sẽ trả lại lượt.',
                     ),
+                    const SizedBox(height: 4),
                     for (final voucher in items)
                       _VoucherCard(
                         voucher: voucher,
@@ -238,62 +239,138 @@ class _VoucherCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final error = Theme.of(context).colorScheme.error;
-    final icon = switch (state) {
-      VoucherState.active => Icons.check_circle_outline,
-      VoucherState.scheduled => Icons.schedule,
-      VoucherState.expired => Icons.event_busy_outlined,
-      VoucherState.usedUp => Icons.remove_circle_outline,
-      VoucherState.stopped => Icons.block,
+    final (icon, color) = switch (state) {
+      VoucherState.active => (Icons.check_circle_outline, Hud.green),
+      VoucherState.scheduled => (Icons.schedule, Hud.blue),
+      VoucherState.expired => (Icons.event_busy_outlined, Hud.redDark),
+      VoucherState.usedUp => (Icons.remove_circle_outline, Hud.redDark),
+      VoucherState.stopped => (Icons.block, Hud.muted),
     };
-    final usable =
-        state == VoucherState.active || state == VoucherState.scheduled;
-    return Card(
+    final usage = voucher.maxUses == 0
+        ? 0.0
+        : (voucher.usedCount / voucher.maxUses).clamp(0.0, 1.0);
+    return Padding(
       key: ValueKey('voucher-${voucher.id}'),
-      child: ListTile(
-        onTap: busy ? null : onView,
-        title: Text('${voucher.code} · giảm ${money(voucher.discountVnd)}'),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              'Đơn từ ${money(voucher.minSubtotalVnd)} · đã dùng '
-              '${voucher.usedCount}/${voucher.maxUses} lượt',
-            ),
-            Text(
-              '${formatLocal(voucher.startsAtUtc)} → '
-              '${formatLocal(voucher.endsAtUtc)}',
-            ),
-            const SizedBox(height: 6),
-            Chip(
-              key: ValueKey('voucher-state-${voucher.id}'),
-              avatar: Icon(icon, size: 18, color: usable ? null : error),
-              label: Text(state.label),
-              visualDensity: VisualDensity.compact,
-            ),
-          ],
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Hud.radius),
+          side: const BorderSide(color: Hud.line),
         ),
-        isThreeLine: true,
-        // A stopped voucher cannot be edited back into use, so it has no menu.
-        trailing: voucher.isActive
-            ? PopupMenuButton<String>(
-                key: ValueKey('voucher-menu-${voucher.id}'),
-                enabled: !busy,
-                tooltip: 'Thao tác',
-                onSelected: (action) => action == 'edit' ? onEdit() : onStop(),
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'edit', child: Text('Sửa')),
-                  PopupMenuItem(value: 'stop', child: Text('Ngừng sử dụng')),
-                ],
-              )
-            : null,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: busy ? null : onView,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Cuống vé: màu theo trạng thái, mép răng cưa.
+                Container(
+                  width: 14,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: .85),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      for (var i = 0; i < 6; i++)
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            spacing: 4,
+                            children: [
+                              Text(
+                                '${voucher.code} · giảm ${money(voucher.discountVnd)}',
+                                style: const TextStyle(
+                                  fontFamilyFallback: Hud.mono,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 15,
+                                  color: Hud.ink,
+                                ),
+                              ),
+                              Text(
+                                'Đơn từ ${money(voucher.minSubtotalVnd)} · đã dùng '
+                                '${voucher.usedCount}/${voucher.maxUses} lượt',
+                                style: const TextStyle(color: Hud.muted),
+                              ),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: usage,
+                                  minHeight: 5,
+                                  color: usage >= 1 ? Hud.redDark : Hud.red,
+                                  backgroundColor: const Color(0xFFF1F5F9),
+                                ),
+                              ),
+                              Text(
+                                '${formatLocal(voucher.startsAtUtc)} → '
+                                '${formatLocal(voucher.endsAtUtc)}',
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  color: Hud.muted,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              StatusPill(
+                                state.label,
+                                color: color,
+                                key: ValueKey('voucher-state-${voucher.id}'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(icon, size: 18, color: color),
+                        // A stopped voucher cannot be edited back into use, so
+                        // it has no menu.
+                        if (voucher.isActive)
+                          PopupMenuButton<String>(
+                            key: ValueKey('voucher-menu-${voucher.id}'),
+                            enabled: !busy,
+                            tooltip: 'Thao tác',
+                            onSelected: (action) =>
+                                action == 'edit' ? onEdit() : onStop(),
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(value: 'edit', child: Text('Sửa')),
+                              PopupMenuItem(
+                                value: 'stop',
+                                child: Text('Ngừng sử dụng'),
+                              ),
+                            ],
+                          )
+                        else
+                          const SizedBox(width: 12),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
-/// Reads one voucher independently from the list, including stopped vouchers.
+// Reads one voucher independently from the list, including stopped vouchers.
 /// This route is read-only: opening details never opens a form or sends a write.
 class VoucherDetailScreen extends StatefulWidget {
   const VoucherDetailScreen({required this.voucherId, super.key});
@@ -327,7 +404,7 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
     final current = future;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chi tiết voucher'),
+        title: const HudTitle('Chi tiết voucher', tag: 'Admin // Promo spec'),
         actions: [
           if (allowed)
             IconButton(
@@ -339,12 +416,12 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
       ),
       body: !allowed
           ? const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'Chỉ tài khoản quản trị mới xem được chi tiết voucher.',
+              child: SingleChildScrollView(
+                child: EmptyState(
                   key: Key('voucher-detail-denied'),
-                  textAlign: TextAlign.center,
+                  icon: Icons.lock_outline,
+                  title:
+                      'Chỉ tài khoản quản trị mới xem được chi tiết voucher.',
                 ),
               ),
             )
@@ -355,52 +432,97 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
               onRetry: reload,
               builder: (voucher) {
                 final state = VoucherPolicy.stateOf(voucher, DateTime.now());
+                final usable =
+                    state == VoucherState.active ||
+                    state == VoucherState.scheduled;
                 return ListView(
                   key: const Key('voucher-detail'),
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                   children: [
-                    SelectableText(
-                      voucher.code,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Chip(label: Text(state.label)),
-                    ),
-                    const SizedBox(height: 12),
-                    _VoucherDetailRow(
-                      label: 'Số tiền giảm',
-                      value: money(voucher.discountVnd),
-                    ),
-                    _VoucherDetailRow(
-                      label: 'Giá trị đơn tối thiểu',
-                      value: money(voucher.minSubtotalVnd),
-                    ),
-                    _VoucherDetailRow(
-                      label: 'Lượt đã dùng / tối đa',
-                      value: '${voucher.usedCount}/${voucher.maxUses}',
-                    ),
-                    _VoucherDetailRow(
-                      label: 'Bắt đầu',
-                      value: formatLocal(voucher.startsAtUtc),
-                    ),
-                    _VoucherDetailRow(
-                      label: 'Kết thúc',
-                      value: formatLocal(voucher.endsAtUtc),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Lượt đã dùng tính cả đơn đang chờ thanh toán. Đơn bị '
-                      'hủy, hết hạn hoặc thanh toán thất bại sẽ trả lại lượt.',
-                    ),
-                    if (!voucher.isActive) ...[
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Voucher đã ngừng sử dụng và không thể bật lại. '
-                        'Các đơn đã dùng mã vẫn giữ nguyên.',
+                    NavyPanel(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const HudLabel(
+                            'Mã voucher',
+                            color: Color(0xFFF87171),
+                          ),
+                          const SizedBox(height: 6),
+                          SelectableText(
+                            voucher.code,
+                            style: const TextStyle(
+                              fontFamilyFallback: Hud.mono,
+                              color: Colors.white,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          StatusPill(
+                            state.label,
+                            color: usable
+                                ? const Color(0xFF86EFAC)
+                                : const Color(0xFFFCA5A5),
+                            background: Colors.white.withValues(alpha: .1),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                    const SectionHeader('Điều kiện áp dụng', tag: 'Rules'),
+                    HudCard(
+                      margin: EdgeInsets.zero,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 4,
+                      ),
+                      child: Column(
+                        children: [
+                          _VoucherDetailRow(
+                            icon: Icons.local_offer_outlined,
+                            label: 'Số tiền giảm',
+                            value: money(voucher.discountVnd),
+                            highlight: true,
+                          ),
+                          _VoucherDetailRow(
+                            icon: Icons.shopping_bag_outlined,
+                            label: 'Giá trị đơn tối thiểu',
+                            value: money(voucher.minSubtotalVnd),
+                          ),
+                          _VoucherDetailRow(
+                            icon: Icons.confirmation_number_outlined,
+                            label: 'Lượt đã dùng / tối đa',
+                            value: '${voucher.usedCount}/${voucher.maxUses}',
+                          ),
+                          _VoucherDetailRow(
+                            icon: Icons.play_circle_outline,
+                            label: 'Bắt đầu',
+                            value: formatLocal(voucher.startsAtUtc),
+                          ),
+                          _VoucherDetailRow(
+                            icon: Icons.stop_circle_outlined,
+                            label: 'Kết thúc',
+                            value: formatLocal(voucher.endsAtUtc),
+                            last: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const InfoBanner(
+                      tag: 'Quy tắc lượt dùng',
+                      message:
+                          'Lượt đã dùng tính cả đơn đang chờ thanh toán. Đơn bị '
+                          'hủy, hết hạn hoặc thanh toán thất bại sẽ trả lại lượt.',
+                    ),
+                    if (!voucher.isActive)
+                      const InfoBanner(
+                        tone: Tone.danger,
+                        message:
+                            'Voucher đã ngừng sử dụng và không thể bật lại. '
+                            'Các đơn đã dùng mã vẫn giữ nguyên.',
+                      ),
                   ],
                 );
               },
@@ -410,18 +532,37 @@ class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
 }
 
 class _VoucherDetailRow extends StatelessWidget {
-  const _VoucherDetailRow({required this.label, required this.value});
+  const _VoucherDetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.highlight = false,
+    this.last = false,
+  });
+  final IconData icon;
   final String label, value;
+  final bool highlight, last;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    decoration: BoxDecoration(
+      border: last ? null : const Border(bottom: BorderSide(color: Hud.line)),
+    ),
+    child: Row(
       children: [
-        Text(label, style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 4),
-        SelectableText(value),
+        Icon(icon, size: 18, color: Hud.muted),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(label, style: const TextStyle(color: Hud.muted)),
+        ),
+        SelectableText(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: highlight ? Hud.red : Hud.ink,
+          ),
+        ),
       ],
     ),
   );

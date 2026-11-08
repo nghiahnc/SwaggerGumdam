@@ -150,7 +150,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
     final userId = session.user?.id;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Đánh giá'),
+        title: const HudTitle('Đánh giá', tag: 'Pilot reports'),
         actions: [
           IconButton(
             tooltip: 'Tải lại',
@@ -161,7 +161,10 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
         bottom: busy
             ? const PreferredSize(
                 preferredSize: Size.fromHeight(4),
-                child: LinearProgressIndicator(key: Key('reviews-busy')),
+                child: LinearProgressIndicator(
+                  key: Key('reviews-busy'),
+                  color: Hud.red,
+                ),
               )
             : null,
       ),
@@ -171,12 +174,13 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
         builder: (reviews) {
           final own = ReviewPolicy.ownReview(reviews, userId);
           return RefreshIndicator(
+            color: Hud.red,
             onRefresh: () async => reload(),
             child: ListView(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
                 _Summary(productName: widget.productName, reviews: reviews),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 _WriteAction(
                   signedIn: session.isSignedIn,
                   isAdmin: session.isAdmin,
@@ -186,15 +190,18 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                   onWrite: () => edit(),
                   onEditOwn: () => edit(own),
                 ),
-                const SizedBox(height: 8),
+                SectionHeader(
+                  'Nhận xét từ khách',
+                  tag: '${reviews.length} báo cáo',
+                ),
                 if (reviews.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text(
-                      'Chưa có đánh giá cho sản phẩm này.',
-                      key: Key('reviews-empty'),
-                      textAlign: TextAlign.center,
-                    ),
+                  const EmptyState(
+                    icon: Icons.rate_review_outlined,
+                    title: 'Chưa có đánh giá cho sản phẩm này.',
+                    message:
+                        'Hãy là người đầu tiên chia sẻ cảm nhận sau khi '
+                        'nhận hàng.',
+                    key: Key('reviews-empty'),
                   ),
                 for (final review in ReviewPolicy.forDisplay(reviews, userId))
                   _ReviewCard(
@@ -256,11 +263,10 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final userId = context.watch<SessionController>().user?.id;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chi tiết đánh giá'),
+        title: const HudTitle('Chi tiết đánh giá', tag: 'Pilot report'),
         actions: [
           IconButton(
             tooltip: 'Tải lại',
@@ -272,35 +278,92 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
       body: AsyncPanel<Review>(
         future: future,
         onRetry: reload,
-        builder: (review) => ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Text(widget.productName, style: theme.textTheme.titleLarge),
-            const SizedBox(height: 16),
-            Text(
-              ReviewPolicy.stars(review.rating),
-              semanticsLabel: '${review.rating} trên 5 sao',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                color: const Color(0xFFF59E0B),
+        builder: (review) {
+          final own = ReviewPolicy.canEdit(review, userId);
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              NavyPanel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const HudLabel('Mô hình', color: Color(0xFFF87171)),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.productName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Text('${review.rating} / 5 sao'),
-            if (ReviewPolicy.canEdit(review, userId)) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Đánh giá của bạn',
-                style: TextStyle(color: theme.colorScheme.primary),
+              const SizedBox(height: 12),
+              HudCard(
+                margin: EdgeInsets.zero,
+                borderColor: own ? Hud.red : Hud.line,
+                accent: own ? Hud.red : null,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            ReviewPolicy.stars(review.rating),
+                            semanticsLabel: '${review.rating} trên 5 sao',
+                            style: const TextStyle(
+                              color: Hud.amber,
+                              fontSize: 26,
+                            ),
+                          ),
+                        ),
+                        StatusPill(
+                          '${review.rating} / 5 sao',
+                          color: const Color(0xFFB45309),
+                          background: Hud.amberSoft,
+                          dot: false,
+                        ),
+                      ],
+                    ),
+                    if (own) ...[
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Đánh giá của bạn',
+                        style: TextStyle(
+                          color: Hud.red,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                    const Divider(height: 24),
+                    Text(
+                      review.comment,
+                      key: const Key('review-detail-comment'),
+                      style: const TextStyle(height: 1.5, fontSize: 15),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Icon(Icons.schedule, size: 16, color: Hud.muted),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Ngày đánh giá: ${formatLocal(review.createdAtUtc)}',
+                          style: const TextStyle(
+                            color: Hud.muted,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
-            const SizedBox(height: 16),
-            Text(review.comment, key: const Key('review-detail-comment')),
-            const SizedBox(height: 16),
-            Text(
-              'Ngày đánh giá: ${formatLocal(review.createdAtUtc)}',
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -321,29 +384,116 @@ class _Summary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final average = ReviewPolicy.average(reviews);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Here rather than in the app bar, where a long kit name is cut.
-            Text(productName, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 4),
-            Text(
-              average == null
-                  ? 'Chưa có điểm đánh giá'
-                  : '$average / 5 ★ · ${reviews.length} đánh giá',
-              key: const Key('reviews-summary'),
-              style: Theme.of(context).textTheme.titleMedium,
+    final counts = List.filled(6, 0);
+    for (final r in reviews) {
+      if (r.rating >= 1 && r.rating <= 5) counts[r.rating]++;
+    }
+    final total = reviews.isEmpty ? 1 : reviews.length;
+    return HudCard(
+      margin: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Here rather than in the app bar, where a long kit name is cut.
+          Text(
+            productName,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Hud.ink,
             ),
-            const SizedBox(height: 4),
-            const Text(
-              'Chỉ khách đã nhận hàng mới viết được đánh giá; mỗi khách một '
-              'đánh giá cho mỗi sản phẩm.',
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 92,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Hud.amberSoft,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      average ?? '–',
+                      style: const TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w900,
+                        color: Hud.ink,
+                      ),
+                    ),
+                    const Icon(Icons.star_rounded, color: Hud.amber),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  children: [
+                    for (var star = 5; star >= 1; star--)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 14,
+                              child: Text(
+                                '$star',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: counts[star] / total,
+                                  minHeight: 6,
+                                  color: Hud.amber,
+                                  backgroundColor: const Color(0xFFF1F5F9),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            SizedBox(
+                              width: 20,
+                              child: Text(
+                                '${counts[star]}',
+                                textAlign: TextAlign.end,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Hud.muted,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            average == null
+                ? 'Chưa có điểm đánh giá'
+                : '$average / 5 ★ · ${reviews.length} đánh giá',
+            key: const Key('reviews-summary'),
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Chỉ khách đã nhận hàng mới viết được đánh giá; mỗi khách một '
+            'đánh giá cho mỗi sản phẩm.',
+            style: TextStyle(color: Hud.muted, height: 1.4),
+          ),
+        ],
       ),
     );
   }
@@ -384,9 +534,11 @@ class _WriteAction extends StatelessWidget {
     // The API would accept a review from an admin who delivered an order to
     // themself, which would read like a real buyer's; the shop only moderates.
     if (isAdmin) {
-      return const Text(
-        'Tài khoản quản trị chỉ xóa được đánh giá của khách, không viết đánh '
-        'giá.',
+      return const InfoBanner(
+        tag: 'Admin mode',
+        message:
+            'Tài khoản quản trị chỉ xóa được đánh giá của khách, không viết '
+            'đánh giá.',
         key: Key('review-admin-note'),
       );
     }
@@ -414,59 +566,66 @@ class _ReviewCard extends StatelessWidget {
   final VoidCallback onOpen, onEdit, onDelete;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      key: ValueKey('review-${review.id}'),
-      child: ListTile(
-        onTap: busy ? null : onOpen,
-        title: Text(
-          ReviewPolicy.stars(review.rating),
-          semanticsLabel: '${review.rating} trên 5 sao',
-          style: const TextStyle(color: Color(0xFFF59E0B)),
+  Widget build(BuildContext context) => HudCard(
+    key: ValueKey('review-${review.id}'),
+    borderColor: own ? Hud.red : Hud.line,
+    accent: own ? Hud.red : null,
+    onTap: busy ? null : onOpen,
+    padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 18,
+          backgroundColor: own ? Hud.redSoft : const Color(0xFFF1F5F9),
+          child: Icon(
+            own ? Icons.person : Icons.person_outline,
+            size: 20,
+            color: own ? Hud.red : Hud.muted,
+          ),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (own)
-              Text(
-                'Đánh giá của bạn',
-                style: TextStyle(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w600,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (own)
+                const Text(
+                  'Đánh giá của bạn',
+                  style: TextStyle(color: Hud.red, fontWeight: FontWeight.w800),
                 ),
+              Text(
+                ReviewPolicy.stars(review.rating),
+                semanticsLabel: '${review.rating} trên 5 sao',
+                style: const TextStyle(color: Hud.amber, fontSize: 16),
               ),
-            Text(review.comment),
-            const SizedBox(height: 4),
-            Text(
-              formatLocal(review.createdAtUtc),
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(review.comment, style: const TextStyle(height: 1.4)),
+              const SizedBox(height: 6),
+              HudLabel(formatLocal(review.createdAtUtc), size: 9),
+            ],
+          ),
         ),
         // Customers only see actions on their own review; the API would
         // answer 404 for anyone else's.
-        trailing: own || canDelete
-            ? PopupMenuButton<String>(
-                key: ValueKey('review-menu-${review.id}'),
-                enabled: !busy,
-                tooltip: 'Thao tác',
-                onSelected: (action) =>
-                    action == 'edit' ? onEdit() : onDelete(),
-                itemBuilder: (_) => [
-                  if (own)
-                    const PopupMenuItem(value: 'edit', child: Text('Sửa')),
-                  if (canDelete)
-                    const PopupMenuItem(value: 'delete', child: Text('Xóa')),
-                ],
-              )
-            : null,
-      ),
-    );
-  }
+        if (own || canDelete)
+          PopupMenuButton<String>(
+            key: ValueKey('review-menu-${review.id}'),
+            enabled: !busy,
+            tooltip: 'Thao tác',
+            onSelected: (action) => action == 'edit' ? onEdit() : onDelete(),
+            itemBuilder: (_) => [
+              if (own) const PopupMenuItem(value: 'edit', child: Text('Sửa')),
+              if (canDelete)
+                const PopupMenuItem(value: 'delete', child: Text('Xóa')),
+            ],
+          ),
+      ],
+    ),
+  );
 }
 
-/// Write or edit a review. The dialog sends the request itself through
+// Write or edit a review. The dialog sends the request itself through
 /// [onSubmit] and closes (returning true) only when it succeeds; when the API
 /// refuses, for example before the order was delivered, it stays open with
 /// what was typed and shows the reason.

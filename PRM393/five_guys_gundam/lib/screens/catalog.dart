@@ -57,6 +57,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
     reload();
   }
 
+  void selectGrade(String value) {
+    grade = value;
+    skip = 0;
+    reload();
+  }
+
   Future<void> refresh() async {
     reload();
     // Lỗi đã được AsyncPanel hiển thị; chỉ chờ để vòng xoay biến mất đúng lúc.
@@ -69,56 +75,142 @@ class _CatalogScreenState extends State<CatalogScreen> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('FiveGuysGundam')),
-    body: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Row(
+  Widget _header() {
+    final none = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide.none,
+    );
+    return NavyPanel(
+      radius: 0,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: search,
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    labelText: 'Tìm tên mô hình',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: IconButton(
-                      tooltip: 'Xóa từ khóa',
-                      onPressed: () {
-                        search.clear();
-                        applySearch();
-                      },
-                      icon: const Icon(Icons.clear),
-                    ),
-                  ),
-                  onSubmitted: (_) => applySearch(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              DropdownButton<String>(
-                value: grade,
-                items: [
-                  const DropdownMenuItem(value: '', child: Text('Tất cả')),
-                  for (final g in catalogGrades)
-                    DropdownMenuItem(value: g, child: Text(g)),
-                ],
-                onChanged: (v) {
-                  grade = v ?? '';
-                  skip = 0;
-                  reload();
-                },
-              ),
+              HudLabel('Hangar // Catalog', color: Color(0xFFF87171)),
+              Spacer(),
+              HudLabel('Sync: online', color: Color(0xFF4ADE80)),
             ],
           ),
+          const SizedBox(height: 6),
+          const Text(
+            'Tìm mô hình cho bộ sưu tập',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: search,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: 'Tìm tên mô hình',
+              prefixIcon: const Icon(Icons.search, color: Hud.red),
+              suffixIcon: IconButton(
+                tooltip: 'Xóa từ khóa',
+                onPressed: () {
+                  search.clear();
+                  applySearch();
+                },
+                icon: const Icon(Icons.clear),
+              ),
+              border: none,
+              enabledBorder: none,
+              focusedBorder: none,
+            ),
+            onSubmitted: (_) => applySearch(),
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final g in ['', ...catalogGrades])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _GradePill(
+                      label: g.isEmpty ? 'Tất cả' : g,
+                      selected: grade == g,
+                      onTap: () => selectGrade(g),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _grid(ProductSearchPage page) => SingleChildScrollView(
+    // Không dùng danh sách lười: trang chỉ có tối đa 20 sản phẩm và thanh
+    // phân trang cuối trang luôn được dựng.
+    physics: const AlwaysScrollableScrollPhysics(),
+    padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (page.totalCount != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Tìm thấy ${page.totalCount} sản phẩm',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Hud.ink,
+                    ),
+                  ),
+                ),
+                if (hasFilter)
+                  const HudLabel('Bộ lọc đang bật', color: Hud.red),
+              ],
+            ),
+          ),
+        for (var i = 0; i < page.items.length; i += 2)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _ProductTile(page.items[i])),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: i + 1 < page.items.length
+                      ? _ProductTile(page.items[i + 1])
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
+          ),
+        _Pager(
+          page: page,
+          onPrevious: () => goToPage(skip - page.pageSize),
+          onNext: () => goToPage(skip + page.pageSize),
         ),
+      ],
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const HudTitle('FiveGuysGundam', tag: 'Gunpla store'),
+    ),
+    body: Column(
+      children: [
+        _header(),
         Expanded(
           child: AsyncPanel<ProductSearchPage>(
             future: future,
             onRetry: reload,
             builder: (page) => RefreshIndicator(
+              color: Hud.red,
               onRefresh: refresh,
               child: page.items.isEmpty
                   ? _EmptyResults(
@@ -128,30 +220,46 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       onClearFilters: clearFilters,
                       onFirstPage: () => goToPage(0),
                     )
-                  : ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(12),
-                      children: [
-                        if (page.totalCount != null)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                            child: Text(
-                              'Tìm thấy ${page.totalCount} sản phẩm',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ),
-                        for (final item in page.items) _ProductTile(item),
-                        _Pager(
-                          page: page,
-                          onPrevious: () => goToPage(skip - page.pageSize),
-                          onNext: () => goToPage(skip + page.pageSize),
-                        ),
-                      ],
-                    ),
+                  : _grid(page),
             ),
           ),
         ),
       ],
+    ),
+  );
+}
+
+class _GradePill extends StatelessWidget {
+  const _GradePill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: selected ? Hud.red : Colors.white.withValues(alpha: .08),
+    shape: StadiumBorder(
+      side: BorderSide(
+        color: selected ? Hud.red : Colors.white.withValues(alpha: .22),
+      ),
+    ),
+    child: InkWell(
+      customBorder: const StadiumBorder(),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+          ),
+        ),
+      ),
     ),
   );
 }
@@ -161,20 +269,75 @@ class _ProductTile extends StatelessWidget {
   final ProductSearchHit item;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: ListTile(
-      leading: const ProductArt(),
-      title: Text(item.name),
-      subtitle: Text(
-        '${item.category} · ${item.grade} · ${item.scale}\n'
-        '${item.fromPriceVnd == null ? 'Chưa có giá' : 'Từ ${money(item.fromPriceVnd!)}'}',
-      ),
-      isThreeLine: true,
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ProductScreen(productId: item.id)),
-      ),
+  Widget build(BuildContext context) => HudCard(
+    margin: EdgeInsets.zero,
+    padding: EdgeInsets.zero,
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ProductScreen(productId: item.id)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Stack(
+          children: [
+            const SizedBox(
+              height: 140,
+              width: double.infinity,
+              child: FittedBox(
+                fit: BoxFit.cover,
+                clipBehavior: Clip.hardEdge,
+                child: ProductArt(size: 140, width: 180),
+              ),
+            ),
+            Positioned(
+              left: 8,
+              top: 8,
+              child: SpecBadge('${item.grade} ${item.scale}', dark: true),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              HudLabel(item.category, color: gradeColor(item.grade), size: 9),
+              const SizedBox(height: 4),
+              SizedBox(
+                height: 40,
+                child: Text(
+                  item.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Hud.ink,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.fromPriceVnd == null
+                          ? 'Chưa có giá'
+                          : 'Từ ${money(item.fromPriceVnd!)}',
+                      style: TextStyle(
+                        color: item.fromPriceVnd == null ? Hud.muted : Hud.red,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, size: 18, color: Hud.muted),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -189,23 +352,29 @@ class _Pager extends StatelessWidget {
   final VoidCallback onPrevious, onNext;
 
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      TextButton(
-        onPressed: page.hasPrevious ? onPrevious : null,
-        child: const Text('Trang trước'),
-      ),
-      Text(
-        page.pageCount == null
-            ? 'Trang ${page.pageNumber}'
-            : 'Trang ${page.pageNumber} / ${page.pageCount}',
-      ),
-      TextButton(
-        onPressed: page.hasNext ? onNext : null,
-        child: const Text('Trang sau'),
-      ),
-    ],
+  Widget build(BuildContext context) => HudCard(
+    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+    child: Row(
+      children: [
+        TextButton(
+          onPressed: page.hasPrevious ? onPrevious : null,
+          child: const Text('Trang trước'),
+        ),
+        Expanded(
+          child: Text(
+            page.pageCount == null
+                ? 'Trang ${page.pageNumber}'
+                : 'Trang ${page.pageNumber} / ${page.pageCount}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        TextButton(
+          onPressed: page.hasNext ? onNext : null,
+          child: const Text('Trang sau'),
+        ),
+      ],
+    ),
   );
 }
 
@@ -228,34 +397,31 @@ class _EmptyResults extends StatelessWidget {
     final beyondLastPage = page.hasPrevious;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(32),
       children: [
-        const Icon(Icons.search_off, size: 48),
-        const SizedBox(height: 12),
-        Text(
-          beyondLastPage
+        EmptyState(
+          icon: Icons.search_off,
+          title: beyondLastPage
               ? 'Trang này không còn sản phẩm.'
               : query.isNotEmpty
               ? 'Không tìm thấy sản phẩm cho “$query”.'
               : 'Không tìm thấy sản phẩm phù hợp.',
-          textAlign: TextAlign.center,
+          message: beyondLastPage
+              ? 'Dữ liệu vừa thay đổi, hãy quay về trang đầu.'
+              : 'Thử đổi từ khóa hoặc bỏ bớt bộ lọc grade.',
+          actions: [
+            if (beyondLastPage)
+              OutlinedButton(
+                onPressed: onFirstPage,
+                child: const Text('Về trang đầu'),
+              )
+            else if (hasFilter)
+              FilledButton.icon(
+                onPressed: onClearFilters,
+                icon: const Icon(Icons.filter_alt_off),
+                label: const Text('Xóa bộ lọc'),
+              ),
+          ],
         ),
-        const SizedBox(height: 16),
-        if (beyondLastPage)
-          Center(
-            child: OutlinedButton(
-              onPressed: onFirstPage,
-              child: const Text('Về trang đầu'),
-            ),
-          )
-        else if (hasFilter)
-          Center(
-            child: OutlinedButton.icon(
-              onPressed: onClearFilters,
-              icon: const Icon(Icons.filter_alt_off),
-              label: const Text('Xóa bộ lọc'),
-            ),
-          ),
       ],
     );
   }
