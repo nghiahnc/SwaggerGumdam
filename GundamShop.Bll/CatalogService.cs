@@ -99,6 +99,7 @@ public class CatalogService(ShopDbContext db)
     public async Task<VariantDto> UpdateVariant(Guid id, VariantUpdateRequest i)
     {
         var x = ShopGuard.Found(await db.Variants.FindAsync(id), "SKU");
+        ShopGuard.Require(!i.IsActive || await db.Products.AnyAsync(p => p.Id == x.ProductId && p.IsActive), "Sản phẩm đã ngừng bán.");
         x.Label = i.Label.Trim(); x.PriceVnd = i.PriceVnd; x.IsActive = i.IsActive;
         await db.SaveChangesAsync(); return ToDto(x);
     }

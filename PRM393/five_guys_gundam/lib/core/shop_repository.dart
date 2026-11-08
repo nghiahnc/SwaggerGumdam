@@ -9,6 +9,9 @@ class ShopRepository {
       pageItems(await api.request('GET', '/api/v1/categories?pageSize=100'))
           .map(Category.fromJson)
           .toList();
+  Future<Category> category(String id) async => Category.fromJson(
+    asJson(await api.request('GET', '/api/v1/categories/$id')),
+  );
 
   Future<List<Product>> products({int page = 1}) async => pageItems(
     await api.request('GET', '/api/v1/products?page=$page&pageSize=20'),

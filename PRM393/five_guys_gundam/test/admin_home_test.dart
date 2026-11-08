@@ -1,3 +1,7 @@
+// Tác giả: Nguyễn Hữu Tài (AgnesLorem) — CE190387, có AI hỗ trợ
+// UC: không có mã UC riêng (FL-08)
+// Mục đích: widget test cho AdminHomeScreen và tab Quản trị theo vai trò
+
 import 'package:five_guys_gundam/core/api_client.dart';
 import 'package:five_guys_gundam/core/session.dart';
 import 'package:five_guys_gundam/core/shop_repository.dart';
@@ -27,8 +31,8 @@ Future<void> pumpWithRepo(WidgetTester tester, Widget home) async {
 
 void main() {
   for (final (entry, title) in [
-    ('Danh mục và sản phẩm', 'Catalog quản trị'),
-    ('Thêm, sửa và ngừng bán', 'Catalog quản trị'),
+    ('Xem, thêm, sửa và ngừng bán danh mục', 'Danh mục'),
+    ('Thêm, sửa và ngừng bán sản phẩm', 'Quản lý sản phẩm'),
     ('Quản lý phiên bản, giá, điều chỉnh tồn', 'SKU và tồn kho'),
     ('Thiết lập mã giảm giá và thời hạn', 'Voucher'),
   ]) {

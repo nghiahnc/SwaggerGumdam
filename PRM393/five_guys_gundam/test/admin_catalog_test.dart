@@ -1,3 +1,7 @@
+// Tác giả: Nguyễn Hữu Tài (AgnesLorem) — CE190387, có AI hỗ trợ
+// UC: UC21–UC24 (FL-06)
+// Mục đích: widget test cho AdminCatalogScreen: sản phẩm
+
 import 'package:five_guys_gundam/core/shop_repository.dart';
 import 'package:five_guys_gundam/screens/admin_catalog.dart';
 import 'package:flutter/material.dart';
@@ -19,8 +23,7 @@ Future<FakeShopApi> pumpCatalog(WidgetTester tester, [FakeShopApi? api]) async {
 }
 
 Finder field(String label) => find.widgetWithText(TextFormField, label);
-Finder addButton(int index) =>
-    find.widgetWithText(FilledButton, 'Thêm').at(index);
+Finder get addButton => find.widgetWithText(FilledButton, 'Thêm');
 
 Future<void> openMenu(
   WidgetTester tester,
@@ -39,72 +42,10 @@ Future<void> openMenu(
 }
 
 void main() {
-  testWidgets('C1 hiển thị danh mục, sản phẩm và trạng thái', (tester) async {
+  testWidgets('C22 hiển thị sản phẩm và trạng thái', (tester) async {
     await pumpCatalog(tester);
-    expect(find.text('High Grade'), findsOneWidget);
     expect(find.text('Freedom Gundam'), findsOneWidget);
-    expect(find.text('high-grade · Đang bán'), findsOneWidget);
-  });
-
-  testWidgets('C2 thêm danh mục gửi POST và tải lại danh sách', (tester) async {
-    final api = await pumpCatalog(tester);
-    await tester.tap(addButton(0));
-    await tester.pumpAndSettle();
-    await tester.enterText(field('Tên'), '  Master Grade ');
-    await tester.enterText(field('Slug'), 'master-grade');
-    await tester.tap(find.text('Lưu'));
-    await tester.pumpAndSettle();
-
-    expect(api.lastBody('POST', '/api/v1/categories')['name'], 'Master Grade');
-    expect(find.text('Master Grade'), findsOneWidget);
-  });
-
-  testWidgets('C3 form danh mục rỗng bị chặn, không gọi API', (tester) async {
-    final api = await pumpCatalog(tester);
-    await tester.tap(addButton(0));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Lưu'));
-    await tester.pump();
-
-    expect(find.text('Không được để trống'), findsNWidgets(2));
-    expect(api.called('POST', '/api/v1/categories'), isFalse);
-  });
-
-  testWidgets('C4 slug trùng hiện lỗi 409 từ API', (tester) async {
-    await pumpCatalog(tester);
-    await tester.tap(addButton(0));
-    await tester.pumpAndSettle();
-    await tester.enterText(field('Tên'), 'Trùng');
-    await tester.enterText(field('Slug'), 'HIGH-GRADE');
-    await tester.tap(find.text('Lưu'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Slug danh mục đã tồn tại.'), findsOneWidget);
-  });
-
-  testWidgets('C5 sửa danh mục điền sẵn dữ liệu cũ và gửi PUT', (tester) async {
-    final api = await pumpCatalog(tester);
-    await openMenu(tester, 'High Grade', 'Sửa');
-    expect(find.text('Sửa danh mục'), findsOneWidget);
-    expect(find.text('high-grade'), findsWidgets);
-
-    await tester.enterText(field('Tên'), 'HG Universal');
-    await tester.tap(find.text('Lưu'));
-    await tester.pumpAndSettle();
-
-    expect(api.called('PUT', '/api/v1/categories/cat-hg'), isTrue);
-    expect(find.text('HG Universal'), findsOneWidget);
-  });
-
-  testWidgets('C6 không ngừng được danh mục còn sản phẩm đang bán', (
-    tester,
-  ) async {
-    await pumpCatalog(tester);
-    await openMenu(tester, 'High Grade', 'Ngừng bán');
-    await tester.tap(find.text('Đồng ý'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Còn sản phẩm đang bán trong danh mục.'), findsOneWidget);
+    expect(find.textContaining('Đang bán'), findsOneWidget);
   });
 
   testWidgets('C7 bấm "Không" ở hộp xác nhận thì không xóa', (tester) async {
@@ -118,7 +59,7 @@ void main() {
 
   testWidgets('C8 thêm sản phẩm gửi kèm categoryId mặc định', (tester) async {
     final api = await pumpCatalog(tester);
-    await tester.tap(addButton(1));
+    await tester.tap(addButton);
     await tester.pumpAndSettle();
     await tester.enterText(field('Tên'), 'Strike Gundam');
     await tester.enterText(field('Slug'), 'strike');
@@ -158,10 +99,83 @@ void main() {
 
     final button = tester.widget<ButtonStyleButton>(
       find.ancestor(
-        of: find.text('Thêm').at(1),
+        of: find.text('Thêm'),
         matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
       ),
     );
     expect(button.onPressed, isNull);
+  });
+
+  testWidgets('C13 sửa sản phẩm gọi PUT, giữ danh mục và tải lại danh sách', (
+    tester,
+  ) async {
+    final api = await pumpCatalog(tester);
+    await openMenu(tester, 'Freedom Gundam', 'Sửa');
+    expect(find.text('Sửa sản phẩm'), findsOneWidget);
+
+    await tester.enterText(field('Tên'), 'Freedom Gundam Rev2');
+    await tester.tap(find.text('Lưu'));
+    await tester.pumpAndSettle();
+
+    final body = api.lastBody('PUT', '/api/v1/products/p-freedom');
+    expect(body['name'], 'Freedom Gundam Rev2');
+    expect(body['categoryId'], 'cat-hg');
+    expect(find.text('Sửa sản phẩm'), findsNothing);
+    expect(find.text('Freedom Gundam Rev2'), findsOneWidget);
+  });
+
+  testWidgets('C14 sửa sản phẩm trùng slug hiện lỗi 409, dữ liệu không đổi', (
+    tester,
+  ) async {
+    final api = await pumpCatalog(tester);
+    api.products.add({
+      'id': 'p-strike',
+      'name': 'Strike Gundam',
+      'slug': 'strike',
+      'categoryId': 'cat-hg',
+      'isActive': true,
+    });
+    await openMenu(tester, 'Freedom Gundam', 'Sửa');
+
+    await tester.enterText(field('Slug'), 'STRIKE');
+    await tester.tap(find.text('Lưu'));
+    await tester.pumpAndSettle();
+
+    expect(api.called('PUT', '/api/v1/products/p-freedom'), isTrue);
+    expect(find.text('Slug sản phẩm đã tồn tại.'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('STRIKE'), findsOneWidget);
+    expect(api.products.first['slug'], 'freedom');
+  });
+
+  testWidgets('C16 sản phẩm thuộc danh mục đã ngừng phải chọn lại danh mục', (
+    tester,
+  ) async {
+    final api = FakeShopApi().seed();
+    api.categories.first['isActive'] = false;
+    api.categories.add({
+      'id': 'cat-mg',
+      'name': 'Master Grade',
+      'slug': 'master-grade',
+      'description': null,
+      'isActive': true,
+    });
+    await pumpCatalog(tester, api);
+    await openMenu(tester, 'Freedom Gundam', 'Sửa');
+
+    await tester.tap(find.text('Lưu'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chọn danh mục'), findsOneWidget);
+    expect(api.called('PUT', '/api/v1/products/p-freedom'), isFalse);
+
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Master Grade').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lưu'));
+    await tester.pumpAndSettle();
+
+    final body = api.lastBody('PUT', '/api/v1/products/p-freedom');
+    expect(body['categoryId'], 'cat-mg');
   });
 }
