@@ -116,7 +116,7 @@ class ShopRepository {
           .map(CartLine.fromJson)
           .toList();
 
-  /// UC30: one line of the own cart, with the current price (404 if not yours).
+  /// The API resolves this ID within the current account's cart.
   Future<CartLine> cartItem(String id) async => CartLine.fromJson(
     asJson(await api.request('GET', '/api/v1/cart/items/$id')),
   );

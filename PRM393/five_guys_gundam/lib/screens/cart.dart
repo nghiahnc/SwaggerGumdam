@@ -8,6 +8,7 @@ import '../core/session.dart';
 import '../core/shop_repository.dart';
 import '../widgets/common.dart';
 import 'account.dart';
+import 'cart_item_detail.dart';
 import 'checkout.dart';
 
 class CartScreen extends StatefulWidget {
@@ -74,20 +75,22 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  /// UC30: chi tiết đọc lại từ API; số lượng có thể đã đổi ở máy khác.
-  Future<void> openDetail(CartLine line) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => CartItemDetailScreen(id: line.id)),
-    );
-    if (mounted) reload();
-  }
-
   Future<void> checkout(int subtotal) async {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => CheckoutScreen(subtotalVnd: subtotal)),
     );
+    if (mounted) reload();
+  }
+
+  Future<void> openDetail(CartLine line) async {
+    if (busy) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => CartItemDetailScreen(cartItemId: line.id),
+      ),
+    );
+    // The item may have changed or been removed while its details were open.
     if (mounted) reload();
   }
 
@@ -141,9 +144,9 @@ class _CartScreenState extends State<CartScreen> {
                               _CartLineCard(
                                 line: line,
                                 busy: busy,
+                                onView: () => openDetail(line),
                                 onChange: (quantity) => change(line, quantity),
                                 onRemove: () => remove(line),
-                                onDetail: () => openDetail(line),
                               ),
                           ],
                         ),
@@ -166,100 +169,99 @@ class _CartLineCard extends StatelessWidget {
   const _CartLineCard({
     required this.line,
     required this.busy,
+    required this.onView,
     required this.onChange,
     required this.onRemove,
-    required this.onDetail,
   });
   final CartLine line;
   final bool busy;
   final ValueChanged<int> onChange;
-  final VoidCallback onRemove;
-  final VoidCallback onDetail;
+  final VoidCallback onView, onRemove;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-        child: Column(
-          spacing: 8,
-          children: [
-            // Hàng trên: ảnh + thông tin + nút xóa.
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 12,
-              children: [
-                const ProductArt(size: 64),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    spacing: 2,
-                    children: [
-                      Text(
-                        line.productName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      Text(
-                        'SKU ${line.sku}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: muted,
-                        ),
-                      ),
-                      Text(
-                        'Đơn giá ${money(line.unitPriceVnd)}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Chi tiết mục giỏ',
-                  onPressed: onDetail,
-                  icon: const Icon(Icons.info_outline),
-                ),
-                IconButton(
-                  tooltip: 'Xóa khỏi giỏ',
-                  onPressed: busy ? null : onRemove,
-                  color: theme.colorScheme.error,
-                  icon: const Icon(Icons.delete_outline),
-                ),
-              ],
-            ),
-            // Hàng dưới trải hết chiều ngang: số lượng | thành tiền.
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Row(
+      key: ValueKey('cart-item-${line.id}'),
+      child: InkWell(
+        onTap: busy ? null : onView,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+          child: Column(
+            spacing: 8,
+            children: [
+              // Hàng trên: ảnh + thông tin + nút xóa.
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 spacing: 12,
                 children: [
-                  _QuantityStepper(
-                    quantity: line.quantity,
-                    onMinus: !busy && line.quantity > minCartQuantity
-                        ? () => onChange(line.quantity - 1)
-                        : null,
-                    onPlus: !busy && line.quantity < maxCartQuantity
-                        ? () => onChange(line.quantity + 1)
-                        : null,
-                  ),
+                  const ProductArt(size: 64),
                   Expanded(
-                    child: Text(
-                      money(line.totalVnd),
-                      textAlign: TextAlign.end,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      spacing: 2,
+                      children: [
+                        Text(
+                          line.productName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        Text(
+                          'SKU ${line.sku}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: muted,
+                          ),
+                        ),
+                        Text(
+                          'Đơn giá ${money(line.unitPriceVnd)}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: muted,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  IconButton(
+                    tooltip: 'Xóa khỏi giỏ',
+                    onPressed: busy ? null : onRemove,
+                    color: theme.colorScheme.error,
+                    icon: const Icon(Icons.delete_outline),
                   ),
                 ],
               ),
-            ),
-          ],
+              // Hàng dưới trải hết chiều ngang: số lượng | thành tiền.
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Row(
+                  spacing: 12,
+                  children: [
+                    _QuantityStepper(
+                      quantity: line.quantity,
+                      onMinus: !busy && line.quantity > minCartQuantity
+                          ? () => onChange(line.quantity - 1)
+                          : null,
+                      onPlus: !busy && line.quantity < maxCartQuantity
+                          ? () => onChange(line.quantity + 1)
+                          : null,
+                    ),
+                    Expanded(
+                      child: Text(
+                        money(line.totalVnd),
+                        textAlign: TextAlign.end,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -408,59 +410,4 @@ class _Placeholder extends StatelessWidget {
       ),
     );
   }
-}
-
-/// UC30: đọc lại một mục giỏ từ `GET /cart/items/{id}`. API chỉ tìm trong giỏ
-/// của tài khoản đang đăng nhập, nên id sai hoặc của người khác là 404.
-class CartItemDetailScreen extends StatefulWidget {
-  const CartItemDetailScreen({required this.id, super.key});
-  final String id;
-  @override
-  State<CartItemDetailScreen> createState() => _CartItemDetailScreenState();
-}
-
-class _CartItemDetailScreenState extends State<CartItemDetailScreen> {
-  late Future<CartLine> future;
-
-  @override
-  void initState() {
-    super.initState();
-    future = fetch();
-  }
-
-  Future<CartLine> fetch() =>
-      context.read<ShopRepository>().cartItem(widget.id);
-
-  void reload() => setState(() {
-    future = fetch();
-  });
-
-  Widget info(String label, String value) => ListTile(
-    contentPadding: EdgeInsets.zero,
-    title: Text(label, style: Theme.of(context).textTheme.labelMedium),
-    subtitle: Text(value, style: Theme.of(context).textTheme.bodyLarge),
-  );
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Chi tiết mục giỏ')),
-    body: AsyncPanel<CartLine>(
-      future: future,
-      onRetry: reload,
-      builder: (line) => ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          info('Sản phẩm', line.productName),
-          info('Mã SKU', line.sku),
-          info('Đơn giá hiện tại', money(line.unitPriceVnd)),
-          info('Số lượng', '${line.quantity}'),
-          info('Thành tiền', money(line.totalVnd)),
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Text('Tồn kho được kiểm tra lại khi đặt hàng.'),
-          ),
-        ],
-      ),
-    ),
-  );
 }

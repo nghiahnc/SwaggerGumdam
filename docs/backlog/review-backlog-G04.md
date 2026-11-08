@@ -1,6 +1,15 @@
 # Review backlog G04 – PRM393 (đối chiếu `G04_PRM393_Backlog.xlsx`)
 
-## Review lại toàn bộ 08/11/2026: hard code, màn hình UI, chạy test (chưa commit)
+## Gộp với bản UC30 của Hiếu Nghĩa (08/11/2026)
+
+Trên `origin/nghiahnc/merge-prm393-features`, Hiếu Nghĩa đã làm UC30 trong 2 commit `7daff9e` và `0dc5692`, với màn riêng `screens/cart_item_detail.dart`. Bản UC30 mình làm trong `cart.dart` bị trùng với bản này.
+
+Khi merge, mình xử lý như sau:
+- **Giữ bản UC30 của Hiếu Nghĩa**, gồm `cart.dart`, `cart_item_detail.dart` và `test/cart_item_detail_test.dart`, và bỏ `CartItemDetailScreen` của mình. Các mục UC30 bên dưới (test G1–G4, Đạt phụ trách UC30) không còn áp dụng.
+- Áp lại phần sửa hard code vào `cart.dart` của bạn ấy: dùng `minCartQuantity`/`maxCartQuantity` thay cho `1`/`99`.
+- Sau khi merge: `flutter analyze` không có lỗi, `flutter test` **232/232 pass**.
+
+## Review lại toàn bộ 08/11/2026: hard code, màn hình UI, chạy test
 
 ### Kết quả chạy
 | Kiểm tra | Kết quả |

@@ -1,0 +1,23 @@
+UC30 cart item detail - real API verification, 2026-11-08
+API: http://127.0.0.1:5299
+Database: GundamShopCartDetailAudit20261108 (isolated; retained after verification)
+Backend: existing compiled API; no backend code changes or build required.
+Requests use separate newly created customers and a dedicated category/product/SKU.
+Tokens and passwords are held in memory and excluded from this report.
+
+PASS API healthy | HTTP 200
+PASS Guest cannot read cart item detail | HTTP 401
+PASS Owner receives complete cart item detail schema | HTTP 200; fields=id,productName,quantity,sku,unitPriceVnd,variantId
+PASS Detail matches product, SKU, unit price, quantity and item identifiers | {"id": "ccf0ff87-9a52-45e7-8a2d-7307aac3f519", "productName": "Cart detail kit 717ad838fb", "quantity": 2, "sku": "CART-DETAIL-717AD838FB", "unitPriceVnd": 320000, "variantId": "9b2efc5b-350b-4d3f-b143-278c2eec2ff8"}
+PASS Quantity update returns stored item | HTTP 200; quantity=5
+PASS Separate detail GET reads current persisted quantity | HTTP 200; quantity=5 (initial=2, updated=5)
+PASS Fixture SKU price update succeeds | HTTP 200; priceVnd=345000
+PASS Detail GET reads current SKU price and retains quantity | HTTP 200; unitPriceVnd=345000; quantity=5
+PASS Another customer cannot read owner item detail | HTTP 404
+PASS Owner deletes their test cart item | HTTP 204
+PASS Deleted item detail is not found | HTTP 404
+PASS Deleted item is absent from owner cart list | HTTP 200; remaining owner items=0
+
+12/12 passed
+Read-after-write checks use separate HTTP GET requests, not the mutation response.
+Cart detail requires no backend additions. Test database and fixture catalog/customers remain isolated.
