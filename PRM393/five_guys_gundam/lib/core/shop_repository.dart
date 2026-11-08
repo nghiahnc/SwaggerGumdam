@@ -91,6 +91,11 @@ class ShopRepository {
       asJsonList(await api.request('GET', '/api/v1/cart/items'))
           .map(CartLine.fromJson)
           .toList();
+
+  /// The API resolves this ID within the current account's cart.
+  Future<CartLine> cartItem(String id) async => CartLine.fromJson(
+    asJson(await api.request('GET', '/api/v1/cart/items/$id')),
+  );
   Future<void> addToCart(String variantId, int quantity) async => api.request(
     'POST',
     '/api/v1/cart/items',
