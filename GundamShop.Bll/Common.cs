@@ -62,7 +62,7 @@ public record CartQuantityRequest([property: Range(1, 99)] int Quantity);
 public record CartItemDto(Guid Id, Guid VariantId, string ProductName, string Sku, long UnitPriceVnd, int Quantity);
 public record CheckoutRequest(Guid AddressId, string? VoucherCode);
 public record OrderItemDto(Guid VariantId, string ProductName, string Sku, long UnitPriceVnd, int Quantity);
-public record OrderDto(Guid Id, string Status, string PaymentStatus, long SubtotalVnd, long DiscountVnd, long TotalVnd, DateTime CreatedAtUtc, DateTime ExpiresAtUtc, IReadOnlyList<OrderItemDto> Items);
+public record OrderDto(Guid Id, Guid UserId, string Status, string PaymentStatus, long SubtotalVnd, long DiscountVnd, long TotalVnd, DateTime CreatedAtUtc, DateTime ExpiresAtUtc, IReadOnlyList<OrderItemDto> Items);
 public record StatusRequest([property: Required] string Status);
 
 public record VoucherRequest([property: Required, MaxLength(64)] string Code, [property: Range(1, long.MaxValue)] long DiscountVnd, [property: Range(0, long.MaxValue)] long MinSubtotalVnd, [property: Range(1, int.MaxValue)] int MaxUses, DateTime StartsAtUtc, DateTime EndsAtUtc);

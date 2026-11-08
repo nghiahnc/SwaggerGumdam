@@ -1,0 +1,59 @@
+PASS S0 malformed signed webhook: invalid JSON | 400 {'title': 'Dữ liệu webhook Stripe không hợp lệ.', 'status': 400}
+PASS S0 malformed signed webhook: non-object event | 400 {'title': 'Dữ liệu webhook Stripe không hợp lệ.', 'status': 400}
+PASS S0 malformed signed webhook: missing event id | 400 {'title': 'Dữ liệu webhook Stripe không hợp lệ.', 'status': 400}
+PASS S0 malformed signed webhook: non-string event id | 400 {'title': 'Dữ liệu webhook Stripe không hợp lệ.', 'status': 400}
+PASS S0 malformed signed webhook: missing event type | 400 {'title': 'Dữ liệu webhook Stripe không hợp lệ.', 'status': 400}
+PASS S0 malformed signed webhook: missing session object | 400 {'title': 'Dữ liệu webhook Stripe không hợp lệ.', 'status': 400}
+PASS S0 malformed signed webhook: non-object session | 400 {'title': 'Dữ liệu webhook Stripe không hợp lệ.', 'status': 400}
+PASS S0 malformed signed webhook: missing session id | 400 {'title': 'Dữ liệu webhook Stripe không hợp lệ.', 'status': 400}
+PASS S0 malformed signed webhook: null session id | 400 {'title': 'Dữ liệu webhook Stripe không hợp lệ.', 'status': 400}
+PASS S0 malformed signed webhook: blank session id | 400 {'title': 'Dữ liệu webhook Stripe không hợp lệ.', 'status': 400}
+PASS S0 a null session id cannot pay an order that has no Stripe session | 400 PendingPayment/Pending
+PASS S1 session opens with a Checkout URL | {'orderId': 'cf917a30-c981-404e-bbea-46babefd766d', 'provider': 'Stripe', 'status': 'Pending', 'checkoutUrl': 'https://checkout.stripe.com/c/pay/cs_test_stubd1a616208b2844cd84cd1d94961be75c'}
+PASS S1 expires_at is the order deadline in UTC, kept inside Stripe's 24 hours | stub=1794192864 expected=1794192864 raw=2026-11-09T02:59:24.3533618
+PASS S1 success/cancel pages are the API pages | http://127.0.0.1:5298/payment/success?session_id={CHECKOUT_SESSION_ID} | http://127.0.0.1:5298/payment/cancel
+PASS S1 a second call reuses the same page
+PASS S0 wrong-type payment_status leaves the order pending | 200 PendingPayment
+PASS S0 wrong-type expires_at leaves the order pending | 200 PendingPayment
+PASS S2 /payment/success is a page | 200 text/html; charset=utf-8
+PASS S2 /payment/cancel is a page | 200 text/html; charset=utf-8
+PASS S3 completed webhook marks the order paid | 200 {'processed': True} Paid
+PASS S4 cancel succeeds | 200 {'id': '073567e9-2f18-4966-824e-d3015fe0635b', 'userId': '00f3580c-ef27-4fc6-94c7-e578c38803d4', 'status': 'Cancelled', 'paymentStatus': 'Cancelled', 'subtotalVnd': 300000, 'discountVnd': 0, 'totalVnd': 300000, 'createdAtUtc': '2026-11-08T02:59:25.5739113', 'expiresAtUtc': '2026-11-09T02:59:25.5739274', 'items': [{'variantId': '068929c5-65ff-4a0f-b1d1-581c7f68dbe6', 'productName': 'Stripe Kit 6eb3ad09', 'sku': 'STRIPE-6EB3AD09', 'unitPriceVnd': 300000, 'quantity': 1}]}
+PASS S4 the Stripe page was expired
+PASS S4 stock given back | 48 -> 49
+PASS S5 cancel refused because the page was paid | 409 {'title': 'Đơn vừa được thanh toán qua Stripe nên không hủy được.', 'status': 409}
+PASS S5 the order is now paid | Paid
+PASS S6 a page closed early does not expire the order | 200 PendingPayment
+PASS S6 expired webhook gives Expired, not PaymentFailed | Expired/Expired
+PASS S6 stock and voucher use given back | stock 47->48 used 0
+PASS S7 too-small total gives a readable 409 | 409 {'title': 'Số tiền đơn quá nhỏ để thanh toán qua Stripe. Hãy hủy đơn rồi đặt lại với tổng tiền lớn hơn.', 'status': 409}
+PASS S8 expiry job expires the order | Expired
+PASS S8 and closes its Stripe page
+PASS S9 a page paid before the deadline makes the order Paid | Paid
+PASS S10 Mock-era order opens a Stripe page | 200 {'orderId': '5e08aff2-de05-487c-91f1-146b49133333', 'provider': 'Stripe', 'status': 'Pending', 'checkoutUrl': 'https://checkout.stripe.com/c/pay/cs_test_stub03f93b6b3a054ea491ceaeb8290256d4'}
+PASS S10 and its webhook is accepted | 200 {'processed': True}
+PASS S10 Mock-era free order is paid at once | 200 {'orderId': '5b48d716-ff2e-463f-979c-f2110826a37f', 'provider': 'Stripe', 'status': 'Paid', 'checkoutUrl': None}
+PASS S11 admin cancels an order that never opened a page | 200 {'id': '44d0584d-9ecc-45a4-88bf-cfc8a43ec360', 'userId': '00f3580c-ef27-4fc6-94c7-e578c38803d4', 'status': 'Cancelled', 'paymentStatus': 'Cancelled', 'subtotalVnd': 300000, 'discountVnd': 0, 'totalVnd': 300000, 'createdAtUtc': '2026-11-08T03:00:55.0030476', 'expiresAtUtc': '2026-11-09T03:00:55.0030534', 'items': [{'variantId': '068929c5-65ff-4a0f-b1d1-581c7f68dbe6', 'productName': 'Stripe Kit 6eb3ad09', 'sku': 'STRIPE-6EB3AD09', 'unitPriceVnd': 300000, 'quantity': 1}]}
+PASS S12 async failure gives PaymentFailed
+PASS S12 a bad signature is refused | 400
+PASS S13 an unrelated event is answered 200, not processed | 200 {'processed': False}
+PASS S13 an unknown page that expired is answered 200, not processed | 200 {'processed': False}
+PASS S13 an unknown page that was paid is still refused | 400 {'title': 'Stripe session chưa được ghi nhận.', 'status': 400}
+PASS S14 cancel succeeds when Stripe no longer has the page | 200 {'id': '0473aaeb-9554-43ad-80c7-b421dc6d6a7b', 'userId': '00f3580c-ef27-4fc6-94c7-e578c38803d4', 'status': 'Cancelled', 'paymentStatus': 'Cancelled', 'subtotalVnd': 300000, 'discountVnd': 0, 'totalVnd': 300000, 'createdAtUtc': '2026-11-08T03:00:55.2549814', 'expiresAtUtc': '2026-11-09T03:00:55.2549858', 'items': [{'variantId': '068929c5-65ff-4a0f-b1d1-581c7f68dbe6', 'productName': 'Stripe Kit 6eb3ad09', 'sku': 'STRIPE-6EB3AD09', 'unitPriceVnd': 300000, 'quantity': 1}]}
+PASS S15 too-large total gives a readable 409 | 409 {'title': 'Số tiền đơn vượt mức Stripe cho phép. Hãy hủy đơn rồi chia thành nhiều đơn nhỏ hơn.', 'status': 409}
+PASS S16 the cancel goes through | 200 {'id': '316a07af-042a-4797-8ecc-426c1fe96997', 'userId': '00f3580c-ef27-4fc6-94c7-e578c38803d4', 'status': 'Cancelled', 'paymentStatus': 'Cancelled', 'subtotalVnd': 300000, 'discountVnd': 0, 'totalVnd': 300000, 'createdAtUtc': '2026-11-08T03:00:55.4115948', 'expiresAtUtc': '2026-11-09T03:00:55.4115996', 'items': [{'variantId': '068929c5-65ff-4a0f-b1d1-581c7f68dbe6', 'productName': 'Stripe Kit 6eb3ad09', 'sku': 'STRIPE-6EB3AD09', 'unitPriceVnd': 300000, 'quantity': 1}]}
+PASS S16 the late page is not handed out | (409, {'title': 'Đơn không chờ thanh toán.', 'status': 409})
+PASS S16 and Stripe closed it | {'id': 'cs_test_stub58a35b91dd23415a9614f2c8b2d6bc0f', 'object': 'checkout.session', 'url': 'https://checkout.stripe.com/c/pay/cs_test_stub58a35b91dd23415a9614f2c8b2d6bc0f', 'status': 'expired', 'payment_status': 'unpaid', 'expires_at': 1794192955, 'success_url': 'http://127.0.0.1:5298/payment/success?session_id={CHECKOUT_SESSION_ID}', 'cancel_url': 'http://127.0.0.1:5298/payment/cancel', 'amount_total': 300000, 'metadata': {'orderId': '316a07af-042a-4797-8ecc-426c1fe96997'}}
+PASS S17 both requests get the same page | (200, {'orderId': '4bdc5fc0-ed9c-419a-912a-c68aa49b1152', 'provider': 'Stripe', 'status': 'Pending', 'checkoutUrl': 'https://checkout.stripe.com/c/pay/cs_test_stub2ec29cc960c84278a634f7bb446363da'}) | (200, {'orderId': '4bdc5fc0-ed9c-419a-912a-c68aa49b1152', 'provider': 'Stripe', 'status': 'Pending', 'checkoutUrl': 'https://checkout.stripe.com/c/pay/cs_test_stub2ec29cc960c84278a634f7bb446363da'})
+PASS S17 the other page is closed, one stays open | [('6363da', 'open'), ('b7634a', 'expired')]
+PASS S18 a double tap gets the same page twice | (200, {'orderId': '7dc7d6ba-14d0-4561-9b67-49a3f08ccd57', 'provider': 'Stripe', 'status': 'Pending', 'checkoutUrl': 'https://checkout.stripe.com/c/pay/cs_test_stub4746a44eded24c0d8a7f5c9c82c55182'}) | (200, {'orderId': '7dc7d6ba-14d0-4561-9b67-49a3f08ccd57', 'provider': 'Stripe', 'status': 'Pending', 'checkoutUrl': 'https://checkout.stripe.com/c/pay/cs_test_stub4746a44eded24c0d8a7f5c9c82c55182'})
+PASS S18 Stripe made one page, with one key | 1 pages, 4 creates
+PASS S19 a Stripe 500 still opens a page | 200 {'orderId': '8ec2a263-1b32-489c-a9e8-566ce2393324', 'provider': 'Stripe', 'status': 'Pending', 'checkoutUrl': 'https://checkout.stripe.com/c/pay/cs_test_stubf9d2cee740d54b679662053a3eef3df1'}
+PASS S19 the second try used a new key | ['gundam-order-8ec2a263-1b32-489c-a9e8-566ce2393324-4ee46151f0275588', 'gundam-order-8ec2a263-1b32-489c-a9e8-566ce2393324-4ee46151f0275588-2e0d152ae4f0425582618bff1202e5c5']
+PASS S19 later calls reuse that page
+PASS S20 an order with 20 minutes left gets a readable 409 | 409 {'title': 'Đơn sắp hết hạn, hãy tạo đơn mới.', 'status': 409}
+PASS S20 and Stripe is not asked
+PASS every Stripe call carried the secret key | 30 calls
+PASS every session creation carried an Idempotency-Key | 20 creations
+
+57/57 passed

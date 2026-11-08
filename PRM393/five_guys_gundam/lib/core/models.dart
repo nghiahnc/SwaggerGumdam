@@ -1,8 +1,18 @@
+import 'dates.dart';
+
 typedef Json = Map<String, dynamic>;
 Json asJson(dynamic value) => Map<String, dynamic>.from(value as Map);
 List<Json> asJsonList(dynamic value) => (value as List).map(asJson).toList();
 List<Json> pageItems(dynamic value) => asJsonList(asJson(value)['items']);
 int asInt(dynamic value) => (value as num).toInt();
+
+// API lưu giờ UTC nhưng trả về không kèm "Z" (EF đọc SQL Server ra Kind=Unspecified).
+// DateTime.parse sẽ hiểu chuỗi thiếu múi giờ là giờ máy, nên ép về UTC.
+final _hasZone = RegExp(r'T.*(Z|[+-]\d\d(:?\d\d)?)$', caseSensitive: false);
+DateTime asUtcDate(dynamic value) {
+  final text = value as String;
+  return DateTime.parse(_hasZone.hasMatch(text) ? text : '${text}Z');
+}
 
 class ShopUser {
   ShopUser.fromJson(Json j)
@@ -53,6 +63,34 @@ class ProductSearchHit {
           : asInt(j['FromPriceVnd']);
   final String id, name, grade, scale, category;
   final int? fromPriceVnd;
+}
+
+/// Một trang kết quả OData: `value` là sản phẩm, `@odata.count` là tổng số
+/// sản phẩm khớp bộ lọc (không phụ thuộc $skip/$top).
+class ProductSearchPage {
+  ProductSearchPage({
+    required this.items,
+    required this.skip,
+    required this.pageSize,
+    this.totalCount,
+  });
+  ProductSearchPage.fromJson(
+    Json j, {
+    required this.skip,
+    required this.pageSize,
+  }) : items = asJsonList(j['value']).map(ProductSearchHit.fromJson).toList(),
+       totalCount = j['@odata.count'] == null ? null : asInt(j['@odata.count']);
+  final List<ProductSearchHit> items;
+  final int skip, pageSize;
+  final int? totalCount;
+
+  int get pageNumber => skip ~/ pageSize + 1;
+  int? get pageCount =>
+      totalCount == null ? null : (totalCount! / pageSize).ceil();
+  bool get hasPrevious => skip > 0;
+  bool get hasNext => totalCount == null
+      ? items.length >= pageSize
+      : skip + items.length < totalCount!;
 }
 
 class Variant {
@@ -111,15 +149,18 @@ class OrderLine {
 class ShopOrder {
   ShopOrder.fromJson(Json j)
     : id = j['id'] as String,
+      userId = j['userId'] as String?,
       status = j['status'] as String,
       paymentStatus = j['paymentStatus'] as String,
       subtotalVnd = asInt(j['subtotalVnd']),
       discountVnd = asInt(j['discountVnd']),
       totalVnd = asInt(j['totalVnd']),
-      createdAtUtc = DateTime.parse(j['createdAtUtc'] as String),
-      expiresAtUtc = DateTime.parse(j['expiresAtUtc'] as String),
+      createdAtUtc = asUtcDate(j['createdAtUtc']),
+      expiresAtUtc = asUtcDate(j['expiresAtUtc']),
       items = asJsonList(j['items']).map(OrderLine.fromJson).toList();
   final String id, status, paymentStatus;
+  // Chủ đơn; null nếu backend cũ chưa trả trường này.
+  final String? userId;
   final int subtotalVnd, discountVnd, totalVnd;
   final DateTime createdAtUtc, expiresAtUtc;
   final List<OrderLine> items;
@@ -133,8 +174,8 @@ class Voucher {
       minSubtotalVnd = asInt(j['minSubtotalVnd']),
       maxUses = asInt(j['maxUses']),
       usedCount = asInt(j['usedCount']),
-      startsAtUtc = DateTime.parse(j['startsAtUtc'] as String),
-      endsAtUtc = DateTime.parse(j['endsAtUtc'] as String),
+      startsAtUtc = parseUtc(j['startsAtUtc'] as String),
+      endsAtUtc = parseUtc(j['endsAtUtc'] as String),
       isActive = j['isActive'] as bool;
   final String id, code;
   final int discountVnd, minSubtotalVnd, maxUses, usedCount;
@@ -149,7 +190,7 @@ class Review {
       userId = j['userId'] as String,
       rating = asInt(j['rating']),
       comment = j['comment'] as String,
-      createdAtUtc = DateTime.parse(j['createdAtUtc'] as String);
+      createdAtUtc = parseUtc(j['createdAtUtc'] as String);
   final String id, productId, userId, comment;
   final int rating;
   final DateTime createdAtUtc;
