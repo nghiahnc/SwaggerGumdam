@@ -78,6 +78,10 @@ def webhook(session_id, type_, paid=True, expires_at=None):
     if expires_at is not None:
         page['expires_at'] = expires_at
     payload = json.dumps({'id': f'evt_{uuid.uuid4().hex}', 'type': type_, 'data': {'object': page}})
+    return signed_webhook(payload)
+
+
+def signed_webhook(payload):
     stamp = str(int(time.time()))
     sig = hmac.new(SECRET.encode(), f'{stamp}.{payload}'.encode(), hashlib.sha256).hexdigest()
     return call('POST', f'{API}/api/v1/payments/stripe/webhook', payload.encode(),
@@ -98,6 +102,24 @@ def wait_status(order_id, token, statuses, seconds=150):
             return o
         time.sleep(3)
     return call('GET', f'{API}/api/v1/orders/{order_id}', token=token)[1]
+
+
+# S0 the raw webhook body bypasses JSON model binding: reject bad envelopes before any payment lookup.
+bad_webhooks = {
+    'invalid JSON': '{',
+    'non-object event': '[]',
+    'missing event id': json.dumps({'type': 'checkout.session.completed'}),
+    'non-string event id': json.dumps({'id': 123, 'type': 'checkout.session.completed'}),
+    'missing event type': json.dumps({'id': 'evt_invalid'}),
+    'missing session object': json.dumps({'id': 'evt_invalid', 'type': 'checkout.session.completed', 'data': {}}),
+    'non-object session': json.dumps({'id': 'evt_invalid', 'type': 'checkout.session.completed', 'data': {'object': []}}),
+    'missing session id': json.dumps({'id': 'evt_invalid', 'type': 'checkout.session.completed', 'data': {'object': {}}}),
+    'null session id': json.dumps({'id': 'evt_invalid', 'type': 'checkout.session.completed', 'data': {'object': {'id': None}}}),
+    'blank session id': json.dumps({'id': 'evt_invalid', 'type': 'checkout.session.completed', 'data': {'object': {'id': ' '}}}),
+}
+for name, payload in bad_webhooks.items():
+    st, r, _ = signed_webhook(payload)
+    check(f'S0 malformed signed webhook: {name}', st == 400, f'{st} {r}')
 
 
 # ---- set-up: admin product with stock, a customer with an address, vouchers
@@ -140,6 +162,14 @@ def session(order_id, token=None):
 
 # S1 session: deadline in UTC, return pages at the API address, reuse
 o1 = make_order()
+st, r, _ = signed_webhook(json.dumps({
+    'id': f'evt_{uuid.uuid4().hex}', 'type': 'checkout.session.completed',
+    'data': {'object': {'id': None, 'payment_status': 'paid'}},
+}))
+untouched = call('GET', f'{API}/api/v1/orders/{o1["id"]}', token=cust)[1]
+check('S0 a null session id cannot pay an order that has no Stripe session',
+      st == 400 and untouched['status'] == 'PendingPayment' and untouched['paymentStatus'] == 'Pending',
+      f'{st} {untouched["status"]}/{untouched["paymentStatus"]}')
 started = time.time()
 st, s1, _ = session(o1['id'])
 ended = time.time()
@@ -158,6 +188,17 @@ creates_before = len([r for r in stub_state()['requests'] if r['path'] == '/v1/c
 st, s1b, _ = session(o1['id'])
 creates_after = len([r for r in stub_state()['requests'] if r['path'] == '/v1/checkout/sessions'])
 check('S1 a second call reuses the same page', st == 200 and s1b['checkoutUrl'] == s1['checkoutUrl'] and creates_after == creates_before)
+
+# Optional fields with the wrong JSON type cannot confirm a payment or expire an order.
+for event_type, field in [('checkout.session.completed', {'payment_status': []}),
+                          ('checkout.session.expired', {'expires_at': 'not-a-number'})]:
+    st, r, _ = signed_webhook(json.dumps({
+        'id': f'evt_{uuid.uuid4().hex}', 'type': event_type,
+        'data': {'object': {'id': stub_s1['id'], **field}},
+    }))
+    unchanged = call('GET', f'{API}/api/v1/orders/{o1["id"]}', token=cust)[1]
+    check(f'S0 wrong-type {next(iter(field))} leaves the order pending',
+          st == 200 and unchanged['status'] == 'PendingPayment', f'{st} {unchanged["status"]}')
 
 # S2 return pages
 for page in ['success', 'cancel']:
