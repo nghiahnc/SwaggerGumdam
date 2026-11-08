@@ -59,6 +59,20 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
     if (mounted) reload();
   }
 
+  Future<void> openDetail(Review review) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReviewDetailScreen(
+          reviewId: review.id,
+          productName: widget.productName,
+        ),
+      ),
+    );
+    // The detail read may have found a newer version or a deleted review.
+    if (mounted) reload();
+  }
+
   /// Sends the form; returns null on success or the message the dialog shows.
   Future<String?> save(int rating, String comment, Review? old) async {
     try {
@@ -192,6 +206,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                       isAdmin: session.isAdmin,
                     ),
                     busy: busy,
+                    onOpen: () => openDetail(review),
                     onEdit: () => edit(review),
                     onDelete: () => remove(
                       review,
@@ -202,6 +217,90 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Reads one review from the API so a detail view never relies on a stale
+/// item from the product's review list. Guests can read this screen too.
+class ReviewDetailScreen extends StatefulWidget {
+  const ReviewDetailScreen({
+    required this.reviewId,
+    required this.productName,
+    super.key,
+  });
+  final String reviewId, productName;
+
+  @override
+  State<ReviewDetailScreen> createState() => _ReviewDetailScreenState();
+}
+
+class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
+  late Future<Review> future;
+
+  @override
+  void initState() {
+    super.initState();
+    reload();
+  }
+
+  void reload() {
+    final next = readable(
+      context.read<ShopRepository>().review(widget.reviewId),
+    );
+    setState(() {
+      future = next;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final userId = context.watch<SessionController>().user?.id;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Chi tiết đánh giá'),
+        actions: [
+          IconButton(
+            tooltip: 'Tải lại',
+            onPressed: reload,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
+      body: AsyncPanel<Review>(
+        future: future,
+        onRetry: reload,
+        builder: (review) => ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(widget.productName, style: theme.textTheme.titleLarge),
+            const SizedBox(height: 16),
+            Text(
+              ReviewPolicy.stars(review.rating),
+              semanticsLabel: '${review.rating} trên 5 sao',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: const Color(0xFFF59E0B),
+              ),
+            ),
+            Text('${review.rating} / 5 sao'),
+            if (ReviewPolicy.canEdit(review, userId)) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Đánh giá của bạn',
+                style: TextStyle(color: theme.colorScheme.primary),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Text(review.comment, key: const Key('review-detail-comment')),
+            const SizedBox(height: 16),
+            Text(
+              'Ngày đánh giá: ${formatLocal(review.createdAtUtc)}',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -306,12 +405,13 @@ class _ReviewCard extends StatelessWidget {
     required this.own,
     required this.canDelete,
     required this.busy,
+    required this.onOpen,
     required this.onEdit,
     required this.onDelete,
   });
   final Review review;
   final bool own, canDelete, busy;
-  final VoidCallback onEdit, onDelete;
+  final VoidCallback onOpen, onEdit, onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -319,6 +419,7 @@ class _ReviewCard extends StatelessWidget {
     return Card(
       key: ValueKey('review-${review.id}'),
       child: ListTile(
+        onTap: busy ? null : onOpen,
         title: Text(
           ReviewPolicy.stars(review.rating),
           semanticsLabel: '${review.rating} trên 5 sao',
