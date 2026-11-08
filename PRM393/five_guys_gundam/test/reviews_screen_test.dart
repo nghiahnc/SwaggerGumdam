@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:five_guys_gundam/screens/reviews.dart';
+import 'package:five_guys_gundam/core/dates.dart';
 
 import 'support/fake_shop_api.dart';
 
@@ -42,6 +43,99 @@ void main() {
     expect(find.text('Đăng nhập để viết đánh giá'), findsOneWidget);
     expect(find.byKey(const ValueKey('review-menu-r-other')), findsNothing);
     expect(find.byKey(const ValueKey('review-menu-r-mine')), findsNothing);
+  });
+
+  testWidgets('a guest opens the latest review from its detail endpoint', (
+    tester,
+  ) async {
+    final created = DateTime.utc(2026, 10, 7, 4, 30);
+    fake.on(
+      'GET',
+      '/api/v1/reviews/r-other',
+      reviewJson(
+        id: 'r-other',
+        rating: 3,
+        comment: 'Nhận xét vừa cập nhật.',
+        createdAtUtc: created,
+      ),
+    );
+    await open(tester);
+    await tester.tap(find.byKey(const ValueKey('review-r-other')));
+    await tester.pumpAndSettle();
+
+    expect(fake.count('GET /api/v1/reviews/r-other'), 1);
+    expect(find.text('Chi tiết đánh giá'), findsOneWidget);
+    expect(find.text('RX-78-2 Gundam'), findsOneWidget);
+    expect(find.text('3 / 5 sao'), findsOneWidget);
+    expect(find.text('Nhận xét vừa cập nhật.'), findsOneWidget);
+    expect(find.text('Ngày đánh giá: ${formatLocal(created)}'), findsOneWidget);
+    expect(find.text('Nhựa đẹp, khớp chắc.'), findsNothing);
+    expect(find.byType(ReviewDialog), findsNothing);
+    expect(fake.calls.where((c) => !c.startsWith('GET ')), isEmpty);
+  });
+
+  testWidgets('a missing review shows the API error and can be retried', (
+    tester,
+  ) async {
+    fake.refuse(
+      'GET',
+      '/api/v1/reviews/r-other',
+      404,
+      'Không tìm thấy đánh giá.',
+    );
+    await open(tester);
+    await tester.tap(find.byKey(const ValueKey('review-r-other')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Không tìm thấy đánh giá.'), findsOneWidget);
+    expect(find.byKey(const Key('review-detail-comment')), findsNothing);
+    fake.on(
+      'GET',
+      '/api/v1/reviews/r-other',
+      reviewJson(id: 'r-other', comment: 'Đã tải lại.'),
+    );
+    await tester.tap(find.text('Thử lại'));
+    await tester.pumpAndSettle();
+
+    expect(fake.count('GET /api/v1/reviews/r-other'), 2);
+    expect(find.text('Đã tải lại.'), findsOneWidget);
+    expect(find.text('Không tìm thấy đánh giá.'), findsNothing);
+  });
+
+  testWidgets('refreshing a detail reads again; returning reloads the list', (
+    tester,
+  ) async {
+    fake.signIn(id: 'customer-1', role: 'Customer');
+    fake.on(
+      'GET',
+      '/api/v1/reviews/r-mine',
+      reviewJson(id: 'r-mine', userId: 'customer-1'),
+    );
+    await open(tester);
+    await tester.tap(find.byKey(const ValueKey('review-r-mine')));
+    await tester.pumpAndSettle();
+    expect(find.text('Đánh giá của bạn'), findsOneWidget);
+
+    fake.on(
+      'GET',
+      '/api/v1/reviews/r-mine',
+      reviewJson(
+        id: 'r-mine',
+        userId: 'customer-1',
+        comment: 'Đánh giá sau khi lắp xong.',
+      ),
+    );
+    await tester.tap(find.byTooltip('Tải lại'));
+    await tester.pumpAndSettle();
+    expect(fake.count('GET /api/v1/reviews/r-mine'), 2);
+    expect(find.text('Đánh giá sau khi lắp xong.'), findsOneWidget);
+
+    stored = stored.where((r) => r['id'] != 'r-mine').toList();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(fake.count('GET $listPath'), 2);
+    expect(find.byKey(const ValueKey('review-r-mine')), findsNothing);
+    expect(find.byKey(const Key('review-write')), findsOneWidget);
   });
 
   testWidgets('sửa/xóa của người khác: only the own review has actions', (

@@ -62,6 +62,11 @@ class ShopRepository {
           .map(Review.fromJson)
           .toList();
 
+  /// Reads the latest review for its detail screen, including changes made
+  /// after the product's review list was loaded.
+  Future<Review> review(String id) async =>
+      Review.fromJson(asJson(await api.request('GET', '/api/v1/reviews/$id')));
+
   Future<List<Address>> addresses() async =>
       asJsonList(await api.request('GET', '/api/v1/addresses'))
           .map(Address.fromJson)
