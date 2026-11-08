@@ -49,6 +49,15 @@ class _ProductScreenState extends State<ProductScreen> {
     return value.clamp(1, max < 1 ? 1 : max);
   }
 
+  /// Giá và tồn có thể đã đổi trong lúc xem, nên quay về là tải lại.
+  Future<void> openVariant(Variant variant) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => VariantDetailScreen(id: variant.id)),
+    );
+    if (mounted) reload();
+  }
+
   void select(Variant variant) => setState(() {
     selectedVariant = variant.id;
     quantity = _clampQuantity(quantity, variant);
@@ -202,6 +211,7 @@ class _ProductScreenState extends State<ProductScreen> {
                       variant: variant,
                       selected: selectedVariant == variant.id,
                       onTap: variant.stock > 0 ? () => select(variant) : null,
+                      onInfo: () => openVariant(variant),
                     ),
                   const SizedBox(height: 8),
                   HudCard(
@@ -342,10 +352,12 @@ class _VariantTile extends StatelessWidget {
     required this.variant,
     required this.selected,
     required this.onTap,
+    required this.onInfo,
   });
   final Variant variant;
   final bool selected;
   final VoidCallback? onTap;
+  final VoidCallback onInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -365,18 +377,156 @@ class _VariantTile extends StatelessWidget {
           '${variant.label} · ${money(variant.priceVnd)}',
           style: const TextStyle(fontWeight: FontWeight.w800),
         ),
-        subtitle: Text(
-          inStock
-              ? 'SKU ${variant.sku} · Còn ${variant.stock}'
-              : 'SKU ${variant.sku} · Hết hàng',
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              inStock
+                  ? 'SKU ${variant.sku} · Còn ${variant.stock}'
+                  : 'SKU ${variant.sku} · Hết hàng',
+            ),
+            const SizedBox(height: 6),
+            StatusPill(
+              inStock ? (variant.stock <= 3 ? 'Sắp hết' : 'Còn hàng') : 'Hết',
+              color: inStock
+                  ? (variant.stock <= 3 ? const Color(0xFFB45309) : Hud.green)
+                  : Hud.muted,
+            ),
+          ],
         ),
-        trailing: StatusPill(
-          inStock ? (variant.stock <= 3 ? 'Sắp hết' : 'Còn hàng') : 'Hết',
-          color: inStock
-              ? (variant.stock <= 3 ? const Color(0xFFB45309) : Hud.green)
-              : Hud.muted,
+        // Nút riêng, vì chạm vào dòng là chọn SKU; SKU hết hàng vẫn xem được.
+        trailing: IconButton(
+          tooltip: 'Chi tiết SKU ${variant.sku}',
+          icon: const Icon(Icons.info_outline),
+          onPressed: onInfo,
         ),
       ),
     );
   }
+}
+
+/// UC14: đọc lại một SKU từ `GET /variants/{id}`. Khách chỉ thấy SKU đang bán
+/// của sản phẩm và danh mục đang bán; SKU khác API trả 404.
+class VariantDetailScreen extends StatefulWidget {
+  const VariantDetailScreen({required this.id, super.key});
+  final String id;
+  @override
+  State<VariantDetailScreen> createState() => _VariantDetailScreenState();
+}
+
+class _VariantDetailScreenState extends State<VariantDetailScreen> {
+  late Future<Variant> future;
+
+  @override
+  void initState() {
+    super.initState();
+    future = fetch();
+  }
+
+  Future<Variant> fetch() => context.read<ShopRepository>().variant(widget.id);
+
+  void reload() => setState(() {
+    future = fetch();
+  });
+
+  Widget info(String label, String value, IconData icon, {Color? color}) =>
+      Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Hud.line)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: Hud.muted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(label, style: const TextStyle(color: Hud.muted)),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: color ?? Hud.ink,
+              ),
+            ),
+          ],
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const HudTitle('Chi tiết SKU', tag: 'Variant spec')),
+    body: AsyncPanel<Variant>(
+      future: future,
+      onRetry: reload,
+      builder: (v) => RefreshIndicator(
+        color: Hud.red,
+        onRefresh: () async => reload(),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            NavyPanel(
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.qr_code_2, color: Hud.red),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        HudLabel('SKU record', color: Color(0xFFF87171)),
+                        SizedBox(height: 2),
+                        Text(
+                          'Giá và tồn kho đọc trực tiếp từ máy chủ',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            HudCard(
+              margin: EdgeInsets.zero,
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+              child: Column(
+                children: [
+                  info('Mã SKU', v.sku, Icons.tag),
+                  info('Phiên bản', v.label, Icons.style_outlined),
+                  info(
+                    'Giá',
+                    money(v.priceVnd),
+                    Icons.sell_outlined,
+                    color: Hud.red,
+                  ),
+                  info(
+                    'Tồn kho',
+                    v.stock > 0 ? '${v.stock}' : 'Hết hàng',
+                    Icons.inventory_2_outlined,
+                    color: v.stock > 0 ? null : Hud.redDark,
+                  ),
+                  info(
+                    'Trạng thái',
+                    v.isActive ? 'Đang bán' : 'Ngừng bán',
+                    Icons.toggle_on_outlined,
+                    color: v.isActive ? Hud.green : Hud.muted,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

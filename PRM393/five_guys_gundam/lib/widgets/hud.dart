@@ -185,6 +185,8 @@ class HudLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
     text.toUpperCase(),
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
     style: TextStyle(
       fontFamilyFallback: Hud.mono,
       fontSize: size,
@@ -570,17 +572,20 @@ class MoneyRow extends StatelessWidget {
         const SizedBox(width: 12),
         Flexible(
           flex: 2,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
+          child: Align(
             alignment: Alignment.centerRight,
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: TextStyle(
-                color: valueColor ?? Hud.ink,
-                fontSize: big ? 22 : 14.5,
-                fontWeight: bold || big ? FontWeight.w900 : FontWeight.w600,
-                fontFeatures: const [FontFeature.tabularFigures()],
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                value,
+                textAlign: TextAlign.end,
+                style: TextStyle(
+                  color: valueColor ?? Hud.ink,
+                  fontSize: big ? 22 : 14.5,
+                  fontWeight: bold || big ? FontWeight.w900 : FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ),
           ),

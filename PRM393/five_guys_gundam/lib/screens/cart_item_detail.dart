@@ -205,9 +205,8 @@ class _CartItemDetailScreenState extends State<CartItemDetailScreen> {
                         ),
                         const SizedBox(height: 12),
                         const InfoBanner(
-                          tone: Tone.warning,
-                          icon: Icons.verified_user_outlined,
-                          tag: 'Quy chuẩn đóng gói Hangar',
+                          icon: Icons.info_outline,
+                          tag: 'Lưu ý',
                           message:
                               'Đổi số lượng hoặc xóa món ở màn Giỏ hàng; màn này '
                               'luôn đọc lại dữ liệu mới nhất từ máy chủ.',

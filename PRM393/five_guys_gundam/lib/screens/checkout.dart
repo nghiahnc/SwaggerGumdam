@@ -192,15 +192,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       const Spacer(),
                       Flexible(
                         flex: 3,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
+                        child: Align(
                           alignment: Alignment.centerRight,
-                          child: Text(
-                            money(widget.subtotalVnd),
-                            style: const TextStyle(
-                              color: Hud.red,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              money(widget.subtotalVnd),
+                              style: const TextStyle(
+                                color: Hud.red,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                           ),
                         ),

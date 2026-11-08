@@ -19,6 +19,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
   // Từ khóa đã gửi đi; phân trang dùng giá trị này chứ không dùng chữ đang gõ.
   String query = '';
   String grade = '';
+  // UC10: thứ tự sắp xếp; đổi thứ tự thì về trang đầu như khi đổi bộ lọc.
+  CatalogSort sort = CatalogSort.nameAsc;
   int skip = 0;
   late Future<ProductSearchPage> future;
 
@@ -35,6 +37,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
       query: query,
       grade: grade,
       skip: skip,
+      sort: sort,
     );
   });
 
@@ -88,8 +91,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
         children: [
           const Row(
             children: [
-              HudLabel('Hangar // Catalog', color: Color(0xFFF87171)),
-              Spacer(),
+              Expanded(
+                child: HudLabel('Hangar // Catalog', color: Color(0xFFF87171)),
+              ),
+              SizedBox(width: 8),
               HudLabel('Sync: online', color: Color(0xFF4ADE80)),
             ],
           ),
@@ -205,6 +210,41 @@ class _CatalogScreenState extends State<CatalogScreen> {
     body: Column(
       children: [
         _header(),
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(16, 2, 12, 2),
+          child: Row(
+            children: [
+              const Icon(Icons.sort, size: 20, color: Hud.red),
+              const SizedBox(width: 8),
+              const Text(
+                'Sắp xếp',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<CatalogSort>(
+                    key: const Key('catalog-sort'),
+                    isExpanded: true,
+                    value: sort,
+                    items: [
+                      for (final s in CatalogSort.values)
+                        DropdownMenuItem(value: s, child: Text(s.label)),
+                    ],
+                    onChanged: (v) {
+                      if (v == null || v == sort) return;
+                      sort = v;
+                      skip = 0;
+                      reload();
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
         Expanded(
           child: AsyncPanel<ProductSearchPage>(
             future: future,
@@ -356,11 +396,15 @@ class _Pager extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
     child: Row(
       children: [
-        TextButton(
-          onPressed: page.hasPrevious ? onPrevious : null,
-          child: const Text('Trang trước'),
+        Flexible(
+          flex: 2,
+          child: TextButton(
+            onPressed: page.hasPrevious ? onPrevious : null,
+            child: const Text('Trang trước', overflow: TextOverflow.ellipsis),
+          ),
         ),
         Expanded(
+          flex: 2,
           child: Text(
             page.pageCount == null
                 ? 'Trang ${page.pageNumber}'
@@ -369,9 +413,12 @@ class _Pager extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ),
-        TextButton(
-          onPressed: page.hasNext ? onNext : null,
-          child: const Text('Trang sau'),
+        Flexible(
+          flex: 2,
+          child: TextButton(
+            onPressed: page.hasNext ? onNext : null,
+            child: const Text('Trang sau', overflow: TextOverflow.ellipsis),
+          ),
         ),
       ],
     ),

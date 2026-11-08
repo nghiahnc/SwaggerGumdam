@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/api_client.dart';
 import '../core/error_text.dart';
 import '../core/models.dart';
+import '../core/order_status.dart';
 import '../core/payment_policy.dart';
 import '../core/shop_repository.dart';
 import '../widgets/common.dart';
@@ -126,7 +127,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       return _PaymentView(order, null, problem: _paymentError(error));
     }
     // With Stripe, a free order (total 0) is marked paid by the session call.
-    if (session['status'] == 'Paid') {
+    if (session['status'] == PaymentStatus.paid) {
       order = await repository.order(widget.orderId);
       return _PaymentView(order, null);
     }
@@ -248,7 +249,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               )
             else if (!view.pending)
               _Outcome(order: view.order, onBack: () => Navigator.pop(context))
-            else if (view.session!['provider'] == 'Mock')
+            else if (view.session!['provider'] == PaymentPolicy.mockProvider)
               _MockActions(busy: busy, onResult: completeMock)
             else if (view.session!['checkoutUrl'] is String)
               _StripeActions(

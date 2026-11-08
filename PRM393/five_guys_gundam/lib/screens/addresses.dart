@@ -53,6 +53,15 @@ class _AddressesScreenState extends State<AddressesScreen> {
     }
   }
 
+  /// Màn chi tiết có thể sửa hoặc xóa, nên quay về là tải lại danh sách.
+  Future<void> openDetail(Address address) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AddressDetailScreen(id: address.id)),
+    );
+    if (mounted) reload();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -77,6 +86,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
           itemBuilder: (context, index) {
             final a = items[index];
             return HudCard(
+              onTap: () => openDetail(a),
               accent: a.isDefault ? Hud.red : null,
               padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
               child: Row(
@@ -132,6 +142,160 @@ class _AddressesScreenState extends State<AddressesScreen> {
             );
           },
         ),
+      ),
+    ),
+  );
+}
+
+/// UC05: đọc lại một địa chỉ từ `GET /addresses/{id}`. API chỉ tìm trong địa
+/// chỉ của tài khoản đang đăng nhập, nên id sai hoặc của người khác là 404.
+class AddressDetailScreen extends StatefulWidget {
+  const AddressDetailScreen({required this.id, super.key});
+  final String id;
+  @override
+  State<AddressDetailScreen> createState() => _AddressDetailScreenState();
+}
+
+class _AddressDetailScreenState extends State<AddressDetailScreen> {
+  late Future<Address> future;
+  bool busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    future = fetch();
+  }
+
+  Future<Address> fetch() => context.read<ShopRepository>().address(widget.id);
+
+  void reload() => setState(() {
+    future = fetch();
+  });
+
+  Future<void> edit(Address current) async {
+    final body = await showDialog<Json>(
+      context: context,
+      builder: (_) => AddressFormDialog(existing: current),
+    );
+    if (body == null || !mounted) return;
+    setState(() => busy = true);
+    try {
+      await context.read<ShopRepository>().saveAddress(body, id: current.id);
+      if (!mounted) return;
+      showSuccess(context, 'Đã lưu địa chỉ');
+      reload();
+    } catch (error) {
+      if (mounted) showError(context, error);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> remove(Address current) async {
+    if (!await confirm(context, 'Xóa địa chỉ của ${current.recipient}?') ||
+        !mounted) {
+      return;
+    }
+    setState(() => busy = true);
+    try {
+      await context.read<ShopRepository>().deleteAddress(current.id);
+      if (!mounted) return;
+      showSuccess(context, 'Đã xóa địa chỉ');
+      Navigator.pop(context);
+    } catch (error) {
+      if (mounted) {
+        setState(() => busy = false);
+        showError(context, error);
+      }
+    }
+  }
+
+  Widget info(String label, String value, IconData icon, {bool last = false}) =>
+      Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          border: last
+              ? null
+              : const Border(bottom: BorderSide(color: Hud.line)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: Hud.muted),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 116,
+              child: Text(label, style: const TextStyle(color: Hud.muted)),
+            ),
+            Expanded(
+              child: Text(
+                value,
+                textAlign: TextAlign.end,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const HudTitle('Chi tiết địa chỉ', tag: 'Delivery coordinates'),
+    ),
+    body: AsyncPanel<Address>(
+      future: future,
+      onRetry: reload,
+      builder: (a) => ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          if (busy) const LinearProgressIndicator(minHeight: 2, color: Hud.red),
+          HudCard(
+            margin: EdgeInsets.zero,
+            accent: a.isDefault ? Hud.red : null,
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
+            child: Column(
+              children: [
+                info('Người nhận', a.recipient, Icons.person_outline),
+                info('Điện thoại', a.phone, Icons.phone_outlined),
+                info('Số nhà / đường', a.line1, Icons.home_outlined),
+                info('Phường / xã', a.ward, Icons.map_outlined),
+                info('Quận / huyện', a.district, Icons.map_outlined),
+                info(
+                  'Tỉnh / thành phố',
+                  a.province,
+                  Icons.location_city_outlined,
+                ),
+                info(
+                  'Mặc định',
+                  a.isDefault ? 'Có' : 'Không',
+                  Icons.star_outline,
+                  last: true,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: busy ? null : () => edit(a),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Sửa'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: busy ? null : () => remove(a),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Xóa'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     ),
   );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/api_client.dart';
+import '../core/cart_policy.dart';
 import '../core/models.dart';
 import '../core/session.dart';
 import '../core/shop_repository.dart';
@@ -44,7 +45,9 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> change(CartLine line, int quantity) async {
-    if (busy || quantity < 1 || quantity > 99) return;
+    if (busy || quantity < minCartQuantity || quantity > maxCartQuantity) {
+      return;
+    }
     setState(() => busy = true);
     try {
       await context.read<ShopRepository>().updateCart(line.id, quantity);
@@ -338,10 +341,10 @@ class _CartLineCard extends StatelessWidget {
             ),
             QtyStepper(
               value: line.quantity,
-              onMinus: !busy && line.quantity > 1
+              onMinus: !busy && line.quantity > minCartQuantity
                   ? () => onChange(line.quantity - 1)
                   : null,
-              onPlus: !busy && line.quantity < 99
+              onPlus: !busy && line.quantity < maxCartQuantity
                   ? () => onChange(line.quantity + 1)
                   : null,
             ),

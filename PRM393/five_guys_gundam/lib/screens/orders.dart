@@ -26,11 +26,11 @@ int itemCount(ShopOrder order) =>
 
 // Màu theo trạng thái đơn; giá trị lạ dùng màu xám.
 MaterialColor orderStatusColor(String status) => switch (status) {
-  'PendingPayment' => Colors.orange,
-  'Paid' => Colors.blue,
-  'Shipped' => Colors.purple,
-  'Delivered' => Colors.green,
-  'PaymentFailed' => Colors.red,
+  OrderStatus.pendingPayment => Colors.orange,
+  OrderStatus.paid => Colors.blue,
+  OrderStatus.shipped => Colors.purple,
+  OrderStatus.delivered => Colors.green,
+  OrderStatus.paymentFailed => Colors.red,
   _ => Colors.blueGrey,
 };
 
@@ -184,7 +184,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           order: order,
                           onTap: () => openDetail(order),
                         ),
-                      if (page > 1 || items.length >= 20)
+                      if (page > 1 ||
+                          items.length >= ShopRepository.ordersPageSize)
                         HudCard(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 4,
@@ -212,7 +213,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 ),
                               ),
                               TextButton.icon(
-                                onPressed: items.length < 20
+                                onPressed:
+                                    items.length < ShopRepository.ordersPageSize
                                     ? null
                                     : () {
                                         page++;
@@ -409,7 +411,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           final isOwner =
               order.userId == null || order.userId == session.user?.id;
           final next = isAdmin ? nextAdminStatus(order.status) : null;
-          final canPay = order.status == 'PendingPayment' && isOwner;
+          final canPay = order.status == OrderStatus.pendingPayment && isOwner;
           final canCancel = canCancelOrder(order.status);
           return Column(
             children: [
@@ -486,7 +488,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           ),
                         ),
                       ],
-                      if (order.status == 'PendingPayment')
+                      if (order.status == OrderStatus.pendingPayment)
                         HudCard(
                           margin: const EdgeInsets.only(top: 10),
                           color: Hud.navy,
@@ -639,12 +641,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             ),
                             onPressed: busy ? null : () => advance(next),
                             icon: Icon(
-                              next == 'Shipped'
+                              next == OrderStatus.shipped
                                   ? Icons.local_shipping_outlined
                                   : Icons.check_circle_outline,
                             ),
                             label: Text(
-                              next == 'Shipped'
+                              next == OrderStatus.shipped
                                   ? 'Xác nhận đã gửi hàng'
                                   : 'Xác nhận đã giao hàng',
                             ),
@@ -677,16 +679,16 @@ class _Timeline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reached = switch (status) {
-      'PendingPayment' => 0,
-      'Paid' => 1,
-      'Shipped' => 2,
-      'Delivered' => 3,
+      OrderStatus.pendingPayment => 0,
+      OrderStatus.paid => 1,
+      OrderStatus.shipped => 2,
+      OrderStatus.delivered => 3,
       _ => 0,
     };
     final closed = const {
-      'Cancelled',
-      'Expired',
-      'PaymentFailed',
+      OrderStatus.cancelled,
+      OrderStatus.expired,
+      OrderStatus.paymentFailed,
     }.contains(status);
     return Column(
       children: [
