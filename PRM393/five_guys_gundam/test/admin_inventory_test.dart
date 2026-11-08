@@ -1,3 +1,7 @@
+// Tác giả: Nguyễn Hữu Tài (AgnesLorem) — CE190387, có AI hỗ trợ
+// UC: UC25–UC28 (FL-07)
+// Mục đích: widget test cho AdminInventoryScreen: SKU và tồn kho
+
 import 'package:five_guys_gundam/core/shop_repository.dart';
 import 'package:five_guys_gundam/screens/admin_inventory.dart';
 import 'package:flutter/material.dart';
@@ -101,6 +105,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('SKU đã tồn tại.'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsOneWidget);
   });
 
   testWidgets(
@@ -153,6 +158,7 @@ void main() {
     await submitStock(tester, '-100', 'Kiểm kê');
 
     expect(find.text('Tồn kho không hợp lệ.'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('450.000 ₫ · Tồn 5 · Đang bán'), findsOneWidget);
   });
 
@@ -163,5 +169,76 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(api.called('DELETE', '/api/v1/variants/v-std'), isTrue);
+  });
+
+  testWidgets('I11 sản phẩm đã ngừng bán thì khóa nút Thêm SKU', (
+    tester,
+  ) async {
+    final api = FakeShopApi().seed();
+    api.products.first['isActive'] = false;
+    await pumpInventory(tester, api);
+
+    final button = tester.widget<ButtonStyleButton>(
+      find.ancestor(
+        of: find.text('Thêm SKU'),
+        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+      ),
+    );
+    expect(button.onPressed, isNull);
+  });
+
+  testWidgets('I12 chặn tồn ban đầu vượt giới hạn của backend', (tester) async {
+    final api = await pumpInventory(tester);
+    await tester.tap(find.text('Thêm SKU'));
+    await tester.pumpAndSettle();
+    await tester.enterText(field('Mã SKU'), 'freedom-big');
+    await tester.enterText(field('Tên phiên bản'), 'Big');
+    await tester.enterText(field('Giá VND'), '1000');
+    await tester.enterText(field('Tồn ban đầu'), '3000000000');
+    await tester.tap(find.text('Lưu'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Vượt giới hạn $maxStock'), findsOneWidget);
+    expect(api.called('POST', '/api/v1/variants'), isFalse);
+  });
+
+  testWidgets('I13 ngừng bán SKU tải lại và đổi nhãn, giữ bản ghi', (
+    tester,
+  ) async {
+    await pumpInventory(tester);
+    await openMenu(tester, 'Ngừng bán');
+    await tester.tap(find.text('Đồng ý'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('FREEDOM-STD · Standard'), findsOneWidget);
+    expect(find.text('450.000 ₫ · Tồn 5 · Ngừng bán'), findsOneWidget);
+  });
+
+  testWidgets('I14 chặn chênh lệch vượt giới hạn của backend', (tester) async {
+    final api = await pumpInventory(tester);
+    await submitStock(tester, '3000000000', 'Kiểm kê');
+
+    expect(find.text('Vượt giới hạn $maxStock'), findsOneWidget);
+    expect(
+      api.called('POST', '/api/v1/variants/v-std/stock-adjustments'),
+      isFalse,
+    );
+  });
+
+  testWidgets('I15 không bật lại SKU khi sản phẩm đã ngừng bán', (
+    tester,
+  ) async {
+    final api = FakeShopApi().seed();
+    api.products.first['isActive'] = false;
+    api.variants.first['isActive'] = false;
+    await pumpInventory(tester, api);
+    await openMenu(tester, 'Sửa giá / tên');
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pump();
+    await tester.tap(find.text('Lưu'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sản phẩm đã ngừng bán.'), findsOneWidget);
+    expect(api.variants.first['isActive'], isFalse);
   });
 }

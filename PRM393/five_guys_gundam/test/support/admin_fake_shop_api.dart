@@ -1,3 +1,7 @@
+// Tác giả: Nguyễn Hữu Tài (AgnesLorem) — CE190387, có AI hỗ trợ
+// UC: dùng chung cho test FL-06..08
+// Mục đích: API giả trong bộ nhớ cho các widget test quản trị
+
 import 'dart:convert';
 
 import 'package:five_guys_gundam/core/api_client.dart';
@@ -97,6 +101,10 @@ class FakeShopApi {
       // ---------- Danh mục ----------
       case 'GET categories':
         return _json(_page(categories));
+      case 'GET categories/{id}':
+        final row = _find(categories, id);
+        if (row == null) return _problem('Không tìm thấy danh mục.', 404);
+        return _json(row);
       case 'POST categories' || 'PUT categories/{id}':
         final slug = (body['slug'] as String).toLowerCase();
         if (categories.any((c) => c['slug'] == slug && c['id'] != id)) {
@@ -162,6 +170,10 @@ class FakeShopApi {
       case 'PUT variants/{id}':
         final row = _find(variants, id);
         if (row == null) return _problem('Không tìm thấy SKU.', 404);
+        if (body['isActive'] == true &&
+            _find(products, row['productId'] as String)?['isActive'] != true) {
+          return _problem('Sản phẩm đã ngừng bán.', 400);
+        }
         row.addAll(body);
         return _json(row);
       case 'DELETE variants/{id}':
