@@ -13,6 +13,8 @@ Tài liệu này nối **màn hình → state/logic → model → endpoint → k
 | `lib/core/models.dart` | Parse DTO JSON thành model Dart có kiểu |
 | `lib/core/shop_repository.dart` | Toàn bộ đường gọi API, trả model cho màn hình |
 | `lib/core/cart_policy.dart` | Quy tắc số lượng trước khi thêm giỏ |
+| `lib/screens/cart_item_detail.dart` | Đọc chi tiết mục giỏ hàng theo ID; kiểm tra đăng nhập, tải lại và hiện lỗi API |
+| `test/cart_item_detail_test.dart` | Widget test chi tiết mục giỏ, dữ liệu mới nhất, quyền truy cập, thử lại và quay về danh sách |
 | `lib/widgets/common.dart` | `AsyncPanel` loading/empty/error/data, tiền VND, validation, dialog xác nhận, snackbar |
 | `lib/screens/shell.dart` | NavigationBar; tab quản trị chỉ hiện cho Admin |
 | `test/cart_policy_test.dart` | Unit test số lượng hợp lệ, 0, >99, vượt tồn; giới hạn tối đa theo tồn |
@@ -39,7 +41,7 @@ Tài liệu này nối **màn hình → state/logic → model → endpoint → k
 | Nguyễn Hữu Tài | `AdminCategoriesScreen`, `CategoryDetailScreen`, `screens/admin_categories.dart` | Danh sách, chi tiết, thêm, sửa, ngừng bán danh mục | `GET/POST/PUT/DELETE /api/v1/categories` |
 | Nguyễn Hữu Tài | `AdminCatalogScreen`, `screens/admin_catalog.dart` | CRUD sản phẩm | `GET/POST/PUT/DELETE /api/v1/products` |
 | Nguyễn Hữu Tài | `AdminInventoryScreen`, `screens/admin_inventory.dart` | CRUD SKU, đổi giá/trạng thái, điều chỉnh tồn | `GET /api/v1/products/{id}/variants`, `POST/PUT/DELETE /api/v1/variants`, `POST /api/v1/variants/{id}/stock-adjustments` |
-| Trần Gia Đạt | `CartScreen`, `screens/cart.dart` | Xem/sửa số lượng/xóa giỏ | `GET/PUT/DELETE /api/v1/cart/items` |
+| Trần Gia Đạt | `CartScreen`, `CartItemDetailScreen`, `screens/cart.dart`, `screens/cart_item_detail.dart` | Xem giỏ, bấm một món để xem chi tiết theo ID; sửa số lượng/xóa giỏ | `GET /api/v1/cart/items`, `GET /api/v1/cart/items/{id}`, `PUT/DELETE /api/v1/cart/items/{id}` |
 | Trần Gia Đạt | `CheckoutScreen`, `screens/checkout.dart` | Chọn địa chỉ, voucher, tạo đơn | `GET /api/v1/addresses`, `POST /api/v1/orders` |
 | Trần Gia Đạt | `OrdersScreen`, `OrderDetailScreen`, `screens/orders.dart` | Theo dõi/hủy đơn, admin giao hàng | `GET /api/v1/orders`, `GET /api/v1/orders/{id}`, `POST /api/v1/orders/{id}/cancel`, `PUT /api/v1/orders/{id}/status` |
 | Trần Hiếu Nghĩa | `VouchersScreen`, `VoucherDetailScreen`, `screens/vouchers.dart` | Danh sách/chi tiết UC39 và CRUD voucher, mức giảm, thời hạn, giới hạn lượt; trạng thái hết hạn/hết lượt | `GET /api/v1/vouchers`, `GET /api/v1/vouchers/{id}`, `POST /api/v1/vouchers`, `PUT/DELETE /api/v1/vouchers/{id}` |

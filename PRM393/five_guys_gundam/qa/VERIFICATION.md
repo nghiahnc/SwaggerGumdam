@@ -37,3 +37,22 @@ Cách thử các màn mới:
 Các kết quả trên do AI thực hiện. Sinh viên chưa xác nhận đã tự chạy thử. Bằng chứng ảnh Android Release ở phần 05/10 là lần chạy cũ; đợt này chưa cập nhật APK hoặc ảnh Release. Stripe với tài khoản thật vẫn cần test key và webhook thật; kiểm thử bằng máy chủ giả lập không thay thế bằng chứng đó.
 
 Stripe giả lập chạy với API `http://127.0.0.1:5298`, máy chủ giả lập `http://127.0.0.1:12118` và database riêng `GundamShopPaymentAudit20261108`. Đã dừng hai tiến trình kiểm thử sau khi hoàn tất; database thử được giữ lại. [Log Stripe 57/57](stripe-e2e-2026-11-08.txt) chứa dữ liệu thử, không chứa token hoặc khóa Stripe thật.
+
+## Kiểm tra chi tiết mục giỏ hàng · 2026-11-08
+
+Nguồn đối chiếu: `G04_PRM393_Backlog.xlsx`, sheet `Backlog`, dòng 37 (`B37`: UC30, `C37`: View Cart Item Details, `K37`: yêu cầu). Người đã đăng nhập chọn một mục giỏ theo ID; API chỉ trả mục thuộc tài khoản hiện tại và trả không tìm thấy nếu ID sai hoặc thuộc tài khoản khác. Workbook được đọc để đối chiếu, giữ nguyên file gốc.
+
+Bấm một món trong Giỏ hàng để mở **Chi tiết món trong giỏ**. Màn hình gọi `GET /api/v1/cart/items/{id}` và hiển thị tên sản phẩm, SKU, đơn giá hiện tại, số lượng, thành tiền. Có **Tải lại**, lỗi có **Thử lại**; quay về sẽ tải lại danh sách để phản ánh món đã đổi hoặc bị xóa ở nơi khác. Màn hình kiểm tra đăng nhập; quyền sở hữu do API hiện có kiểm tra.
+
+| Kiểm tra | Kết quả |
+| --- | --- |
+| `flutter analyze --no-pub` | Không có issue |
+| `test/cart_item_detail_test.dart` | **8/8 đạt**: đọc mới theo ID, refresh, 404/thử lại, khách chưa đăng nhập, 401, quay về tải lại giỏ, nút Tăng/Xóa không mở chi tiết, màn 320px |
+| Các test liên quan hiện có | **26/26 đạt**: `cart_orders_edge_test.dart` (20), `cart_checkout_widget_test.dart` (4), `cart_policy_test.dart` (2) |
+| Nhóm test giỏ hàng/đặt hàng | **34/34 đạt** |
+| Toàn bộ Flutter sau cập nhật nhánh gộp | **197/197 đạt** với `flutter test --no-pub --concurrency=1`; mã tại `7daff9e`, nền quản trị `ef75a0d` |
+| Build API trên bản gộp cuối | **0 lỗi, 0 cảnh báo**; không thay đổi backend cho tính năng chi tiết giỏ |
+
+API thật đã qua **12/12 kiểm tra** với database thử riêng `GundamShopCartDetailAudit20261108`, cổng `5299`: khách chưa đăng nhập 401, chủ giỏ đọc đúng trường/giá/số lượng, GET riêng sau khi đổi số lượng và giá SKU trả dữ liệu mới, khách khác 404, xóa 204 và đọc lại 404. Đã dừng API thử; giữ database thử. [Log kiểm tra API](cart-item-detail-api-2026-11-08.txt) chỉ chứa dữ liệu thử, không chứa token hoặc mật khẩu.
+
+Đây là kiểm tra do AI thực hiện; chưa có xác nhận sinh viên đã tự chạy lại. Tính năng sử dụng API hiện có; chưa build lại APK trong đợt này.

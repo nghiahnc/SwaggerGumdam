@@ -7,6 +7,7 @@ import '../core/session.dart';
 import '../core/shop_repository.dart';
 import '../widgets/common.dart';
 import 'account.dart';
+import 'cart_item_detail.dart';
 import 'checkout.dart';
 
 class CartScreen extends StatefulWidget {
@@ -79,6 +80,17 @@ class _CartScreenState extends State<CartScreen> {
     if (mounted) reload();
   }
 
+  Future<void> openDetail(CartLine line) async {
+    if (busy) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => CartItemDetailScreen(cartItemId: line.id),
+      ),
+    );
+    // The item may have changed or been removed while its details were open.
+    if (mounted) reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     final signedIn = context.watch<SessionController>().isSignedIn;
@@ -129,6 +141,7 @@ class _CartScreenState extends State<CartScreen> {
                               _CartLineCard(
                                 line: line,
                                 busy: busy,
+                                onView: () => openDetail(line),
                                 onChange: (quantity) => change(line, quantity),
                                 onRemove: () => remove(line),
                               ),
@@ -153,93 +166,99 @@ class _CartLineCard extends StatelessWidget {
   const _CartLineCard({
     required this.line,
     required this.busy,
+    required this.onView,
     required this.onChange,
     required this.onRemove,
   });
   final CartLine line;
   final bool busy;
   final ValueChanged<int> onChange;
-  final VoidCallback onRemove;
+  final VoidCallback onView, onRemove;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-        child: Column(
-          spacing: 8,
-          children: [
-            // Hàng trên: ảnh + thông tin + nút xóa.
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 12,
-              children: [
-                const ProductArt(size: 64),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    spacing: 2,
-                    children: [
-                      Text(
-                        line.productName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      Text(
-                        'SKU ${line.sku}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: muted,
-                        ),
-                      ),
-                      Text(
-                        'Đơn giá ${money(line.unitPriceVnd)}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Xóa khỏi giỏ',
-                  onPressed: busy ? null : onRemove,
-                  color: theme.colorScheme.error,
-                  icon: const Icon(Icons.delete_outline),
-                ),
-              ],
-            ),
-            // Hàng dưới trải hết chiều ngang: số lượng | thành tiền.
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Row(
+      key: ValueKey('cart-item-${line.id}'),
+      child: InkWell(
+        onTap: busy ? null : onView,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+          child: Column(
+            spacing: 8,
+            children: [
+              // Hàng trên: ảnh + thông tin + nút xóa.
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 spacing: 12,
                 children: [
-                  _QuantityStepper(
-                    quantity: line.quantity,
-                    onMinus: !busy && line.quantity > 1
-                        ? () => onChange(line.quantity - 1)
-                        : null,
-                    onPlus: !busy && line.quantity < 99
-                        ? () => onChange(line.quantity + 1)
-                        : null,
-                  ),
+                  const ProductArt(size: 64),
                   Expanded(
-                    child: Text(
-                      money(line.totalVnd),
-                      textAlign: TextAlign.end,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      spacing: 2,
+                      children: [
+                        Text(
+                          line.productName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        Text(
+                          'SKU ${line.sku}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: muted,
+                          ),
+                        ),
+                        Text(
+                          'Đơn giá ${money(line.unitPriceVnd)}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: muted,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  IconButton(
+                    tooltip: 'Xóa khỏi giỏ',
+                    onPressed: busy ? null : onRemove,
+                    color: theme.colorScheme.error,
+                    icon: const Icon(Icons.delete_outline),
                   ),
                 ],
               ),
-            ),
-          ],
+              // Hàng dưới trải hết chiều ngang: số lượng | thành tiền.
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Row(
+                  spacing: 12,
+                  children: [
+                    _QuantityStepper(
+                      quantity: line.quantity,
+                      onMinus: !busy && line.quantity > 1
+                          ? () => onChange(line.quantity - 1)
+                          : null,
+                      onPlus: !busy && line.quantity < 99
+                          ? () => onChange(line.quantity + 1)
+                          : null,
+                    ),
+                    Expanded(
+                      child: Text(
+                        money(line.totalVnd),
+                        textAlign: TextAlign.end,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
