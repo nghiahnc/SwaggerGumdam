@@ -10,7 +10,7 @@ import '../core/shop_repository.dart';
 import '../core/voucher_policy.dart';
 import '../widgets/common.dart';
 
-/// Admin voucher management: list, add, edit and stop using vouchers.
+/// Admin voucher management: list, view, add, edit and stop using vouchers.
 ///
 /// Every endpoint here is Admin-only on the API. The list is read again after
 /// each write because checkout changes `usedCount` outside this screen.
@@ -44,6 +44,15 @@ class _VouchersScreenState extends State<VouchersScreen> {
     });
   }
 
+  Future<void> view(Voucher voucher) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => VoucherDetailScreen(voucherId: voucher.id),
+      ),
+    );
+    if (mounted) reload();
+  }
+
   /// Sends the form; returns null on success or the message the dialog shows.
   Future<String?> save(VoucherInput input, Voucher? old) async {
     try {
@@ -63,13 +72,18 @@ class _VouchersScreenState extends State<VouchersScreen> {
     final messenger = ScaffoldMessenger.of(context);
     if (old != null) {
       // The list may be minutes old; a checkout since then decides whether
-      // the code can still change. If the read fails, the list copy is used.
+      // the code can still change. A failed read must not unlock stale values.
       final repository = context.read<ShopRepository>();
       setState(() => busy = true);
-      var fresh = old;
+      final Voucher fresh;
       try {
         fresh = await repository.voucher(old.id);
-      } catch (_) {}
+      } catch (error) {
+        if (!mounted) return;
+        setState(() => busy = false);
+        _show(messenger, describeError(error));
+        return;
+      }
       if (!mounted) return;
       setState(() => busy = false);
       // Stopped by another admin since the list loaded: nothing to edit.
@@ -189,6 +203,7 @@ class _VouchersScreenState extends State<VouchersScreen> {
                         voucher: voucher,
                         state: VoucherPolicy.stateOf(voucher, now),
                         busy: busy,
+                        onView: () => view(voucher),
                         onEdit: () => edit(voucher),
                         onStop: () => stop(voucher),
                       ),
@@ -212,13 +227,14 @@ class _VoucherCard extends StatelessWidget {
     required this.voucher,
     required this.state,
     required this.busy,
+    required this.onView,
     required this.onEdit,
     required this.onStop,
   });
   final Voucher voucher;
   final VoucherState state;
   final bool busy;
-  final VoidCallback onEdit, onStop;
+  final VoidCallback onView, onEdit, onStop;
 
   @override
   Widget build(BuildContext context) {
@@ -235,6 +251,7 @@ class _VoucherCard extends StatelessWidget {
     return Card(
       key: ValueKey('voucher-${voucher.id}'),
       child: ListTile(
+        onTap: busy ? null : onView,
         title: Text('${voucher.code} · giảm ${money(voucher.discountVnd)}'),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,6 +291,140 @@ class _VoucherCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Reads one voucher independently from the list, including stopped vouchers.
+/// This route is read-only: opening details never opens a form or sends a write.
+class VoucherDetailScreen extends StatefulWidget {
+  const VoucherDetailScreen({required this.voucherId, super.key});
+  final String voucherId;
+
+  @override
+  State<VoucherDetailScreen> createState() => _VoucherDetailScreenState();
+}
+
+class _VoucherDetailScreenState extends State<VoucherDetailScreen> {
+  Future<Voucher>? future;
+
+  @override
+  void initState() {
+    super.initState();
+    if (context.read<SessionController>().isAdmin) reload();
+  }
+
+  void reload() {
+    final next = readable(
+      context.read<ShopRepository>().voucher(widget.voucherId),
+    );
+    setState(() {
+      future = next;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allowed = context.watch<SessionController>().isAdmin;
+    final current = future;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Chi tiết voucher'),
+        actions: [
+          if (allowed)
+            IconButton(
+              tooltip: 'Tải lại',
+              onPressed: reload,
+              icon: const Icon(Icons.refresh),
+            ),
+        ],
+      ),
+      body: !allowed
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Chỉ tài khoản quản trị mới xem được chi tiết voucher.',
+                  key: Key('voucher-detail-denied'),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            )
+          : current == null
+          ? const SizedBox.shrink()
+          : AsyncPanel<Voucher>(
+              future: current,
+              onRetry: reload,
+              builder: (voucher) {
+                final state = VoucherPolicy.stateOf(voucher, DateTime.now());
+                return ListView(
+                  key: const Key('voucher-detail'),
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    SelectableText(
+                      voucher.code,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Chip(label: Text(state.label)),
+                    ),
+                    const SizedBox(height: 12),
+                    _VoucherDetailRow(
+                      label: 'Số tiền giảm',
+                      value: money(voucher.discountVnd),
+                    ),
+                    _VoucherDetailRow(
+                      label: 'Giá trị đơn tối thiểu',
+                      value: money(voucher.minSubtotalVnd),
+                    ),
+                    _VoucherDetailRow(
+                      label: 'Lượt đã dùng / tối đa',
+                      value: '${voucher.usedCount}/${voucher.maxUses}',
+                    ),
+                    _VoucherDetailRow(
+                      label: 'Bắt đầu',
+                      value: formatLocal(voucher.startsAtUtc),
+                    ),
+                    _VoucherDetailRow(
+                      label: 'Kết thúc',
+                      value: formatLocal(voucher.endsAtUtc),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Lượt đã dùng tính cả đơn đang chờ thanh toán. Đơn bị '
+                      'hủy, hết hạn hoặc thanh toán thất bại sẽ trả lại lượt.',
+                    ),
+                    if (!voucher.isActive) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Voucher đã ngừng sử dụng và không thể bật lại. '
+                        'Các đơn đã dùng mã vẫn giữ nguyên.',
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
+    );
+  }
+}
+
+class _VoucherDetailRow extends StatelessWidget {
+  const _VoucherDetailRow({required this.label, required this.value});
+  final String label, value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 4),
+        SelectableText(value),
+      ],
+    ),
+  );
 }
 
 /// The values the API's VoucherRequest takes.

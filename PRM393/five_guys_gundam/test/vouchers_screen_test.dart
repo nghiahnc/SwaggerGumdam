@@ -32,25 +32,25 @@ void main() {
   late FakeShopApi fake;
   setUp(() {
     fake = FakeShopApi()..signIn();
-    fake.on(
-      'GET',
-      '/api/v1/vouchers',
-      page([
-        voucherJson(
-          id: 'v-active',
-          code: 'SALE10',
-          startsAtUtc: activeStart,
-          endsAtUtc: activeEnd,
-        ),
-        voucherJson(
-          id: 'v-expired',
-          code: 'SUMMER',
-          startsAtUtc: expiredEnd.subtract(const Duration(days: 10)),
-          endsAtUtc: expiredEnd,
-        ),
-        voucherJson(id: 'v-stopped', code: 'OLD', isActive: false),
-      ]),
-    );
+    final vouchers = [
+      voucherJson(
+        id: 'v-active',
+        code: 'SALE10',
+        startsAtUtc: activeStart,
+        endsAtUtc: activeEnd,
+      ),
+      voucherJson(
+        id: 'v-expired',
+        code: 'SUMMER',
+        startsAtUtc: expiredEnd.subtract(const Duration(days: 10)),
+        endsAtUtc: expiredEnd,
+      ),
+      voucherJson(id: 'v-stopped', code: 'OLD', isActive: false),
+    ];
+    fake.on('GET', '/api/v1/vouchers', page(vouchers));
+    for (final voucher in vouchers) {
+      fake.on('GET', '/api/v1/vouchers/${voucher['id']}', voucher);
+    }
   });
 
   Future<void> open(WidgetTester tester) async {
@@ -238,6 +238,11 @@ void main() {
       '/api/v1/vouchers',
       page([voucherJson(id: 'v-used', usedCount: 5, maxUses: 10)]),
     );
+    fake.on(
+      'GET',
+      '/api/v1/vouchers/v-used',
+      voucherJson(id: 'v-used', usedCount: 5, maxUses: 10),
+    );
     await open(tester);
     await chooseMenu(tester, 'v-used', 'Sửa');
     expect(
@@ -260,6 +265,11 @@ void main() {
         page([voucherJson(id: 'v-legacy', code: 'TẾT 2026', maxUses: 5000000)]),
       );
       fake.on('PUT', '/api/v1/vouchers/v-legacy', voucherJson(id: 'v-legacy'));
+      fake.on(
+        'GET',
+        '/api/v1/vouchers/v-legacy',
+        voucherJson(id: 'v-legacy', code: 'TẾT 2026', maxUses: 5000000),
+      );
       await open(tester);
       await chooseMenu(tester, 'v-legacy', 'Sửa');
       await tester.tap(find.byKey(const Key('voucher-save')));
@@ -420,6 +430,16 @@ void main() {
         voucherJson(id: 'v-new', code: 'FRESH'),
       ]),
     );
+    fake.on(
+      'GET',
+      '/api/v1/vouchers/v-used',
+      voucherJson(id: 'v-used', code: 'USED', usedCount: 1),
+    );
+    fake.on(
+      'GET',
+      '/api/v1/vouchers/v-new',
+      voucherJson(id: 'v-new', code: 'FRESH'),
+    );
     TextField codeField() => tester.widget<TextField>(
       find.descendant(
         of: find.byKey(const Key('voucher-code')),
@@ -472,6 +492,34 @@ void main() {
       find.textContaining('tính cả đơn đang chờ thanh toán'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('editing waits for a successful fresh read and permits retry', (
+    tester,
+  ) async {
+    fake.on('GET', '/api/v1/vouchers/v-active', null, status: 401);
+    await open(tester);
+    await chooseMenu(tester, 'v-active', 'Sửa');
+    expect(find.text('Sửa voucher'), findsNothing);
+    expect(find.byKey(const Key('vouchers-busy')), findsNothing);
+    expect(
+      find.text('Phiên đăng nhập đã hết hạn. Hãy đăng xuất rồi đăng nhập lại.'),
+      findsOneWidget,
+    );
+    expect(fake.calls.where((call) => call.startsWith('PUT ')), isEmpty);
+
+    fake.on(
+      'GET',
+      '/api/v1/vouchers/v-active',
+      voucherJson(id: 'v-active', usedCount: 1),
+    );
+    await chooseMenu(tester, 'v-active', 'Sửa');
+    expect(find.text('Sửa voucher'), findsOneWidget);
+    expect(
+      find.text('Đã có đơn dùng mã này nên không đổi được mã'),
+      findsOneWidget,
+    );
+    expect(fake.count('GET /api/v1/vouchers/v-active'), 2);
   });
 
   test('vouchers beyond the first 100 are read too', () async {
