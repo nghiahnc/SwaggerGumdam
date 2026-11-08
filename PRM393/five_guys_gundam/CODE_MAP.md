@@ -26,7 +26,7 @@ Tài liệu này nối **màn hình → state/logic → model → endpoint → k
 | `lib/core/payment_policy.dart` | Câu kết quả thanh toán, kể cả khi tiền đến lúc đơn đã đóng (`RefundRequired`); nhãn trạng thái đơn lấy từ `order_status.dart` để giống màn đơn hàng |
 | `test/support/fake_shop_api.dart` | API giả cho widget test (MockClient), ghi lại mọi request |
 | `test/voucher_policy_test.dart`, `test/review_payment_policy_test.dart` | Unit test quy tắc voucher, đánh giá, thanh toán và đọc ngày UTC |
-| `test/vouchers_screen_test.dart`, `test/reviews_screen_test.dart`, `test/payment_screen_test.dart` | Widget test FL-13..15 theo cột "Kiểm thử tối thiểu" của bảng phân công |
+| `test/vouchers_screen_test.dart`, `test/voucher_detail_screen_test.dart`, `test/reviews_screen_test.dart`, `test/payment_screen_test.dart` | Widget test FL-13..15, gồm chi tiết UC39/UC44, lỗi API và tải lại |
 
 ## 2. Map màn hình và API
 
@@ -41,8 +41,8 @@ Tài liệu này nối **màn hình → state/logic → model → endpoint → k
 | Trần Gia Đạt | `CartScreen`, `screens/cart.dart` | Xem/sửa số lượng/xóa giỏ | `GET/PUT/DELETE /api/v1/cart/items` |
 | Trần Gia Đạt | `CheckoutScreen`, `screens/checkout.dart` | Chọn địa chỉ, voucher, tạo đơn | `GET /api/v1/addresses`, `POST /api/v1/orders` |
 | Trần Gia Đạt | `OrdersScreen`, `OrderDetailScreen`, `screens/orders.dart` | Theo dõi/hủy đơn, admin giao hàng | `GET /api/v1/orders`, `GET /api/v1/orders/{id}`, `POST /api/v1/orders/{id}/cancel`, `PUT /api/v1/orders/{id}/status` |
-| Trần Hiếu Nghĩa | `VouchersScreen`, `screens/vouchers.dart` | CRUD voucher, mức giảm, thời hạn, giới hạn lượt; trạng thái hết hạn/hết lượt | `GET /api/v1/vouchers`, `GET /api/v1/vouchers/{id}`, `POST /api/v1/vouchers`, `PUT/DELETE /api/v1/vouchers/{id}` |
-| Trần Hiếu Nghĩa | `ReviewsScreen`, `screens/reviews.dart` | Xem/viết/sửa/xóa review sau khi đơn đã giao; Admin xóa được review của khách | `GET /api/v1/products/{id}/reviews`, `POST/PUT/DELETE /api/v1/reviews` |
+| Trần Hiếu Nghĩa | `VouchersScreen`, `VoucherDetailScreen`, `screens/vouchers.dart` | Danh sách/chi tiết UC39 và CRUD voucher, mức giảm, thời hạn, giới hạn lượt; trạng thái hết hạn/hết lượt | `GET /api/v1/vouchers`, `GET /api/v1/vouchers/{id}`, `POST /api/v1/vouchers`, `PUT/DELETE /api/v1/vouchers/{id}` |
+| Trần Hiếu Nghĩa | `ReviewsScreen`, `ReviewDetailScreen`, `screens/reviews.dart` | Danh sách/chi tiết UC44; viết/sửa/xóa review sau khi đơn đã giao; Admin xóa được review của khách | `GET /api/v1/products/{id}/reviews`, `GET /api/v1/reviews/{id}`, `POST/PUT/DELETE /api/v1/reviews` |
 | Trần Hiếu Nghĩa | `PaymentScreen`, `screens/payment.dart` | Mock success/fail hoặc mở Stripe; đọc lại trạng thái đơn sau thanh toán | `GET /api/v1/orders/{id}`, `POST /api/v1/payments/orders/{id}/session`, `POST /api/v1/payments/mock/orders/{id}/complete` |
 
 Backend không nhận yêu cầu trực tiếp từ các widget: mọi request đi qua `ShopRepository` và `ApiClient`. Backend code tham chiếu: [ShopRoutes.cs](../../GundamShop.Api/ShopRoutes.cs) (route/quyền), [GundamShop.Bll](../../GundamShop.Bll) (nghiệp vụ), [GundamShop.Dal](../../GundamShop.Dal) (EF/SQL Server).
