@@ -5,7 +5,10 @@ import 'order_status.dart';
 /// The values are the API's (GundamShop.Bll/ShoppingService.cs,
 /// PaymentService.cs, GundamShop.Api/PendingOrderExpiryService.cs).
 abstract final class PaymentPolicy {
-  static const pending = 'PendingPayment';
+  static const pending = OrderStatus.pendingPayment;
+
+  /// `Payments:Provider` of the API, as returned in the payment session.
+  static const mockProvider = 'Mock';
 
   /// The order screens' labels, so an order reads the same on both.
   static String orderStatus(String status) => orderStatusLabel(status);
@@ -13,7 +16,7 @@ abstract final class PaymentPolicy {
   /// Money that reached an order after it closed (cancelled, expired or
   /// failed). The API keeps the closed status and only marks the payment;
   /// the refund is done by hand.
-  static const refundRequired = 'RefundRequired';
+  static const refundRequired = PaymentStatus.refundRequired;
 
   static bool needsRefund(String? paymentStatus) =>
       paymentStatus == refundRequired;
@@ -35,18 +38,17 @@ abstract final class PaymentPolicy {
           'thanh toán lại đơn này.';
     }
     return switch (status) {
-      'Paid' || 'Shipped' || 'Delivered' =>
+      OrderStatus.paid || OrderStatus.shipped || OrderStatus.delivered =>
         'Thanh toán thành công. Đơn đã được ghi nhận là đã thanh toán.',
-      'PaymentFailed' =>
+      OrderStatus.paymentFailed =>
         'Thanh toán thất bại. Đơn đã đóng; tồn kho và lượt voucher (nếu có) '
             'đã được hoàn lại.',
-      'Cancelled' => 'Đơn đã bị hủy nên không thể thanh toán.',
-      'Expired' => 'Đơn đã quá hạn thanh toán. Hãy tạo đơn mới.',
+      OrderStatus.cancelled => 'Đơn đã bị hủy nên không thể thanh toán.',
+      OrderStatus.expired => 'Đơn đã quá hạn thanh toán. Hãy tạo đơn mới.',
       _ => 'Đơn không còn chờ thanh toán (${orderStatus(status)}).',
     };
   }
 
   static bool succeeded(String status, {String? paymentStatus}) =>
-      !needsRefund(paymentStatus) &&
-      (status == 'Paid' || status == 'Shipped' || status == 'Delivered');
+      !needsRefund(paymentStatus) && OrderStatus.isPaid(status);
 }

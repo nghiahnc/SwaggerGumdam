@@ -26,11 +26,11 @@ int itemCount(ShopOrder order) =>
 
 // Màu theo trạng thái đơn; giá trị lạ dùng màu xám.
 MaterialColor orderStatusColor(String status) => switch (status) {
-  'PendingPayment' => Colors.orange,
-  'Paid' => Colors.blue,
-  'Shipped' => Colors.purple,
-  'Delivered' => Colors.green,
-  'PaymentFailed' => Colors.red,
+  OrderStatus.pendingPayment => Colors.orange,
+  OrderStatus.paid => Colors.blue,
+  OrderStatus.shipped => Colors.purple,
+  OrderStatus.delivered => Colors.green,
+  OrderStatus.paymentFailed => Colors.red,
   _ => Colors.blueGrey,
 };
 
@@ -197,7 +197,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           order: order,
                           onTap: () => openDetail(order),
                         ),
-                      if (page > 1 || items.length >= 20)
+                      if (page > 1 ||
+                          items.length >= ShopRepository.ordersPageSize)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -213,7 +214,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             ),
                             Text('Trang $page'),
                             TextButton.icon(
-                              onPressed: items.length < 20
+                              onPressed:
+                                  items.length < ShopRepository.ordersPageSize
                                   ? null
                                   : () {
                                       page++;
@@ -414,7 +416,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       label: 'Tạo lúc',
                       value: formatDateTime(order.createdAtUtc),
                     ),
-                    if (order.status == 'PendingPayment')
+                    if (order.status == OrderStatus.pendingPayment)
                       _InfoRow(
                         icon: Icons.timer_outlined,
                         label: 'Hạn thanh toán',
@@ -502,7 +504,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   spacing: 8,
                   children: [
-                    if (order.status == 'PendingPayment' && isOwner)
+                    if (order.status == OrderStatus.pendingPayment && isOwner)
                       FilledButton.icon(
                         onPressed: busy ? null : () => pay(order),
                         icon: const Icon(Icons.payment),
@@ -522,12 +524,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       FilledButton.icon(
                         onPressed: busy ? null : () => advance(next),
                         icon: Icon(
-                          next == 'Shipped'
+                          next == OrderStatus.shipped
                               ? Icons.local_shipping_outlined
                               : Icons.check_circle_outline,
                         ),
                         label: Text(
-                          next == 'Shipped'
+                          next == OrderStatus.shipped
                               ? 'Xác nhận đã gửi hàng'
                               : 'Xác nhận đã giao hàng',
                         ),
